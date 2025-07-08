@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Word Maker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h2>Word Maker</h2>
+        <form action="/predict" method="post">
+            <p>Input Starting Letter(optional)</p>
+            <input type="text" id="sLetter" name="sLetter" maxlength="1" pattern="[a-zA-Z]"><br><br>
+            <p>Input Length(optional)</p>
+            <input type="number" id="length" name="length" min="0"><br><br>
+
+            <input type="submit" value="Word">
+        </form>
+        <h3>Word(Or not?): {{ word }}</h3>
+    </div>
+</body>
+<audio controls autoplay>
+  <source src="{{ url_for('static', filename='joker.ogg') }}" type="audio/ogg">
+</audio>
+</html>

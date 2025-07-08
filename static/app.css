@@ -1,0 +1,38 @@
+body {
+    font-family: 'Courier New', Courier, monospace, sans-serif;
+    color: white;
+    background-color: #160068;
+    padding: 40px;
+}
+
+.container {
+    background: #753838;
+    padding: 20px 30px;
+    border-radius: 8px;
+    max-width: 600px;
+    margin: auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+audio{
+    padding: 600px;
+}
+
+input {
+    font-size: 16px;
+    color: white;
+    background-color: #753838;
+}
+
+input[type="submit"] {
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #0077cc;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+input[type="submit"]:hover {
+    background-color: #005fa3;
+}

@@ -1,6 +1,7 @@
 import random
 import csv
-from flask import Flask, request, render_template
+import os
+from flask import Flask, render_template, url_for, request
 CSV_ONE = "place.csv"
 CSV_TWO = "relative.csv"
 
@@ -97,10 +98,26 @@ app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("app.html", prediction=None)
-
+    song_folder = os.path.join(app.static_folder, 'songs')
+    songs = [f for f in os.listdir(song_folder) if f.endswith('.ogg')]
+    random_song = random.choice(songs)
+    song_url = url_for('static', filename=f'songs/{random_song}')
+    pic_folder = os.path.join(app.static_folder, 'images')
+    pics = [f for f in os.listdir(pic_folder) if f.endswith('.jpg')]
+    random_pic = random.choice(pics)
+    pic_url = url_for('static', filename=f'images/{random_pic}')
+    return render_template('app.html', song_url=song_url, pic_url=pic_url)
 @app.route("/predict", methods=["POST"])
 def guess():
+    song_folder = os.path.join(app.static_folder, 'songs')
+    songs = [f for f in os.listdir(song_folder) if f.endswith('.ogg')]
+    random_song = random.choice(songs)
+    song_url = url_for('static', filename=f'songs/{random_song}')
+    pic_folder = os.path.join(app.static_folder, 'images')
+    pics = [f for f in os.listdir(pic_folder) if f.endswith('.jpg')]
+    random_pic = random.choice(pics)
+    pic_url = url_for('static', filename=f'images/{random_pic}')
+    print(pic_url)
     sLetter = request.form.get("sLetter", "")
     length = request.form.get("length", "")
     if (sLetter):
@@ -120,7 +137,7 @@ def guess():
         if length:
             max = int(length)
         else:
-            max = random.randint(7,10)
+            max = random.randint(2,10)
         char_array = []
        
         for x in range(max):
@@ -144,8 +161,9 @@ def guess():
                 if help == True:
                     char1 = char2
             char_array.append(char1)
+            print(char_array)
     reconstructed = ''.join(char_array)
-    return render_template("app.html", word = reconstructed)
+    return render_template("app.html", word = reconstructed, song_url=song_url, pic_url=pic_url)
 
 
 

@@ -1,10 +1,26 @@
 import random
 import csv
 import os
+import torch
+import argparse
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSeq2SeqLM,
+    Trainer,
+    TrainingArguments,
+)
 from flask import Flask, render_template, url_for, request
 CSV_ONE = "place.csv"
 CSV_TWO = "relative.csv"
+parser = argparse.ArgumentParser(description="Fake definition generator")
 
+parser.add_argument("--output_dir", type=str, default="fake_def_model")
+parser.add_argument("--model_dir", type=str, default="fake_def_model")
+args = parser.parse_args()
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
+model = AutoModelForSeq2SeqLM.from_pretrained(args.model_dir).to(device)
+print(f"Loaded model from {args.model_dir} on {device}")
 def by_place(placeNum,place):
     n = 0
     for i in place[placeNum]:
@@ -144,7 +160,26 @@ def by_relative(placeNum,relative):
             p += 1
     return relative[0][p-1]
 
+def interactive_generate(model, tokenizer, device,word):
+    print("\nEnter words to generate fake definitions. Type 'exit' to quit.")
+    FEW = """
+    {word} refers to
+    """
 
+    prompt = FEW.format(word=word)
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+    outputs = model.generate(
+        input_ids,
+        max_length=60,
+        do_sample=True,
+        top_k=50,
+        top_p=0.92,
+        temperature=0.8,
+        num_return_sequences=1,
+    )
+    print("  " + tokenizer.decode(outputs[0], skip_special_tokens=True) + "\n")
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 # ===== Flask Web App =====
 app = Flask(__name__)
@@ -211,7 +246,8 @@ def guess():
             char_array.append(char1)
             print(char_array)
     reconstructed = ''.join(char_array)
-    return render_template("app.html", word = reconstructed, song_url=song_url, pic_url=pic_url)
+    definition = interactive_generate(model, tokenizer, device,reconstructed)
+    return render_template("app.html", word = reconstructed, song_url=song_url, pic_url=pic_url, definition = definition)
 
 
 

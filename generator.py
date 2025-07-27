@@ -182,7 +182,7 @@ def interactive_generate(model, tokenizer, device,word):
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 # ===== Flask Web App =====
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='static', template_folder='templates')
 
 @app.route("/", methods=["GET"])
 def index():

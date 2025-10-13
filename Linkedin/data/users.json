@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "users": [
+    {
+      "user_id": "u_hIzmTrmmvrA",
+      "email": "pcleavitt@cox.net",
+      "pw_hash": "344c1a510878cf54dfab53b72456f846066758f12762f86e90171f645e0b8d59",
+      "key_points": "A pragmatic senior builder who posts concise, actionable LinkedIn content about modular Python for LLMs, reproducible fine‑tuning and ML pipelines, OAuth/onboarding diagnostics with reusable test.py patterns, composable demos (OpenAI, LiveKit, Deepgram, SendGrid), and game‑dev/prototyping notes; format posts as 3–6 quick tips, short problem→steps threads, or mini case studies with a gist/repo or before/after screenshot; voice is direct, technically precise, slightly wry; target audience is mid‑senior ML/LLM engineers and engineering managers, with secondary reach to indie founders, product engineers, contractors, and local dev/game/3D‑print hobbyists.",
+      "about_me": "Creative Junior Developer and systems thinker blending modular Python, scalable JavaScript, and LLM workflows into clean, testable architecture. I specialize in debugging complexity—whether it's OAuth flows, prompt engineering, or game mechanics—with a tone that's candid, dryly witty, and relentlessly precise. I build tools that work, messages that land, and experiences that feel intentional. Currently collaborating with ATA, Tech Alley, and Intagly to prototype smarter, more human-centered AI systems. As a joke, don't like Javascript. I don't know everything and won't act like I do.",
+      "display_name": "",
+      "notify_on_draft": false,
+      "auto_generate_enabled": true,
+      "auto_posts_per_day": 2,
+      "auto_window_start": "09:00",
+      "auto_window_end": "17:00"
+    }
+  ]
+}

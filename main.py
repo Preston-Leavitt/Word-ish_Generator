@@ -1594,10 +1594,10 @@ async def auth_register(response: Response, body: Dict = Body(...)):
     # NEW: set secure, scoped cookie for deployed host
     try:
         response.set_cookie(
-            key="auth_token",
+            key="session",
             value=token,
             httponly=True,
-            samesite="lax",
+            samesite="none",
             secure=True,
             domain=HOST_DOMAIN,
             path="/",
@@ -2328,3 +2328,57 @@ async def admin_get_auto_state(request: Request, user_id: Optional[str] = None):
         return {"user_id": user_id, "state": st}
     # shallow copy to avoid mutation races
     return {"auto_state": {uid: dict(st) for uid, st in AUTO_STATE.items()}}
+@app.post("/api/drafts/auto-generate-toggle")
+async def auto_generate_toggle(request: Request, body: Dict = Body(...)):
+    """
+    Toggle auto-generate drafts on/off for the current user.
+    Request JSON: { "enabled": true|false, "generate_now": false }  // generate_now optional
+    Response: { enabled, next_run_at, generated_draft_id?, notice? }
+    """
+    user_id = _validate_user(request)
+    enabled = bool(body.get("enabled"))
+    generate_now = bool(body.get("generate_now", False))
+
+    # Flip state and schedule/unschedule
+    _set_auto_enabled(user_id, enabled)
+    st = AUTO_STATE.get(user_id) or {}
+    next_run_at = st.get("next_run_at")
+
+    # Ensure a scheduled time exists when enabling
+    if enabled and not next_run_at:
+        try:
+            next_run_at = _schedule_next_for_user(user_id).isoformat()
+        except Exception:
+            next_run_at = None
+
+    generated_id = None
+    notice = None
+
+    # Optional immediate generation attempt (guards enforced inside)
+    if enabled and generate_now:
+        try:
+            if _scheduled_auto_attempt(user_id):
+                store = DRAFT_STORE.get(user_id, {})
+                if store:
+                    d = sorted(
+                        store.values(),
+                        key=lambda x: getattr(x, "created_at", getattr(x, "publish_at", datetime.datetime.utcnow())),
+                        reverse=True
+                    )[0]
+                    generated_id = getattr(d, "id", None)
+            else:
+                notice = "Auto enabled; generation skipped by guards."
+        except Exception as e:
+            logging.warning("[AutoToggle] generate_now_failed user=%s err=%s", user_id, e)
+            notice = "Auto enabled; immediate generation failed."
+
+    if not notice:
+        notice = "Auto-generate enabled. Next run: {}".format(next_run_at or "(scheduled)") if enabled else "Auto-generate disabled."
+
+    return {
+        "enabled": enabled,
+        "next_run_at": next_run_at,
+        "generated_draft_id": generated_id,
+        "notice": notice
+    }
+# --- end toggle endpoint ---

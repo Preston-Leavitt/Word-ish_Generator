@@ -233,6 +233,56 @@ def _issue_token(user_id: str) -> str:
     AUTH_TOKENS[tok] = user_id
     return tok
 
+# NEW: cookie helpers for consistent prod/dev behavior
+def _set_auth_cookie(response: Response, token: str):
+    """
+    Set auth cookie consistently:
+    - Name: auth_token
+    - Dev: secure=False, host-only cookie
+    - Prod: secure=True, domain=HOST_DOMAIN
+    """
+    prod = (os.getenv("ENV", "").lower() == "prod")
+    kwargs = {
+        "key": "auth_token",
+        "value": token,
+        "httponly": True,
+        "samesite": "lax",
+        "path": "/",
+        "max_age": 60 * 60 * 24 * 30
+    }
+    if prod:
+        kwargs["secure"] = True
+        if HOST_DOMAIN:
+            kwargs["domain"] = HOST_DOMAIN
+    else:
+        kwargs["secure"] = False
+    response.set_cookie(**kwargs)
+
+def _clear_auth_cookie(response: Response):
+    """
+    Best-effort clear for both current and legacy cookie names,
+    with/without domain to cover dev + prod.
+    """
+    try:
+        response.delete_cookie(key="auth_token", path="/")
+    except Exception:
+        pass
+    try:
+        if HOST_DOMAIN:
+            response.delete_cookie(key="auth_token", domain=HOST_DOMAIN, path="/")
+    except Exception:
+        pass
+    # Legacy cookie cleanup
+    try:
+        response.delete_cookie(key="session", path="/")
+    except Exception:
+        pass
+    try:
+        if HOST_DOMAIN:
+            response.delete_cookie(key="session", domain=HOST_DOMAIN, path="/")
+    except Exception:
+        pass
+
 def _user_from_auth_header(request: Request) -> Optional[str]:
     auth = request.headers.get("Authorization") or ""
     if auth.startswith("Bearer "):
@@ -240,9 +290,18 @@ def _user_from_auth_header(request: Request) -> Optional[str]:
         uid = AUTH_TOKENS.get(token)
         if uid:
             return uid
-    # NEW: cookie fallback
+    # NEW: header token fallback
     try:
-        cookie_tok = request.cookies.get("auth_token")
+        header_tok = request.headers.get("X-Auth-Token")
+        if header_tok:
+            uid = AUTH_TOKENS.get(header_tok)
+            if uid:
+                return uid
+    except Exception:
+        pass
+    # NEW: cookie fallbacks (auth_token preferred, legacy 'session' supported)
+    try:
+        cookie_tok = request.cookies.get("auth_token") or request.cookies.get("session")
         if cookie_tok:
             uid = AUTH_TOKENS.get(cookie_tok)
             if uid:
@@ -1591,18 +1650,9 @@ async def auth_register(response: Response, body: Dict = Body(...)):
     # --- persist to disk ---
     _persist_users()
     token = _issue_token(user_id)
-    # NEW: set secure, scoped cookie for deployed host
+    # CHANGED: use consistent auth cookie helper (was 'session' cookie with differing options)
     try:
-        response.set_cookie(
-            key="session",
-            value=token,
-            httponly=True,
-            samesite="none",
-            secure=True,
-            domain=HOST_DOMAIN,
-            path="/",
-            max_age=60*60*24*30  # 30 days
-        )
+        _set_auth_cookie(response, token)
     except Exception:
         pass
     return {
@@ -1620,18 +1670,9 @@ async def auth_login(response: Response, body: Dict = Body(...)):
     if not rec or rec.get("pw_hash") != _hash_password(password):
         raise HTTPException(status_code=401, detail="invalid credentials")
     token = _issue_token(rec["user_id"])
-    # NEW: set secure, scoped cookie for deployed host
+    # CHANGED: use consistent auth cookie helper (one code path for dev/prod)
     try:
-        response.set_cookie(
-            key="auth_token",
-            value=token,
-            httponly=True,
-            samesite="lax",
-            secure=True,
-            domain=HOST_DOMAIN,
-            path="/",
-            max_age=60*60*24*30
-        )
+        _set_auth_cookie(response, token)
     except Exception:
         pass
     return {
@@ -1651,12 +1692,12 @@ async def auth_logout(request: Request, response: Response):
     if auth.startswith("Bearer "):
         token = auth.split(" ", 1)[1].strip()
         AUTH_TOKENS.pop(token, None)
-    # also clear cookie-based session (match set_cookie domain/path)
+    # CHANGED: clear both possible cookie tokens and remove mappings
     try:
-        cookie_tok = request.cookies.get("auth_token")
+        cookie_tok = request.cookies.get("auth_token") or request.cookies.get("session")
         if cookie_tok:
             AUTH_TOKENS.pop(cookie_tok, None)
-        response.delete_cookie(key="auth_token", domain=HOST_DOMAIN, path="/")
+        _clear_auth_cookie(response)
     except Exception:
         pass
     return {"ok": True}

@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LinkedIn Viral Post Generator</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<style>
+  /* Design tokens */
+  :root{
+    --bg: #f5f7f9;
+    --card: #ffffff;
+    --text: #222;
+    --muted: #555;
+    --border: #d9e2e8;
+    --accent: #0a66c2;
+    --accent-2: #5b9bd5;
+    --chip-bg: #eef4f7;
+    --chip-fg: #005471;
+    --shadow-1: 0 6px 16px rgba(13, 27, 42, .06);
+    --shadow-2: 0 10px 30px rgba(13, 27, 42, .10);
+    --grad: linear-gradient(135deg, var(--accent), #0f93ff);
+    --field-bg: color-mix(in srgb, var(--card) 96%, #ffffff 4%);
+    --field-bd: color-mix(in srgb, var(--border) 92%, #000 8%);
+    --field-tx: var(--text);
+    --field-hover: color-mix(in srgb, var(--field-bd) 70%, var(--accent) 30%);
+    --field-focus: color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  body.dark-mode{
+    --bg:#0f1419; --card:#0d1117; --text:#e6edf3; --muted:#9aa7b3; --border:#22303c;
+    --chip-bg:#17212b; --chip-fg:#8cd2ff; --shadow-1: 0 6px 18px rgba(0,0,0,.45); --shadow-2: 0 10px 40px rgba(0,0,0,.6);
+    --accent:#0a66c2; --accent-2:#5b9bd5; --grad: linear-gradient(135deg, #1677ff, #00b2ff);
+    --field-bg: color-mix(in srgb, var(--card) 92%, #0b1320 8%);
+    --field-bd: color-mix(in srgb, var(--border) 86%, #fff 14%);
+    --field-tx: var(--text);
+    --field-hover: color-mix(in srgb, var(--field-bd) 70%, var(--accent) 30%);
+    --field-focus: color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+
+  /* Base */
+  body { background:var(--bg); color:var(--text); }
+  header { 
+    background: radial-gradient(1200px 380px at 10% -20%, rgba(10,102,194,.18), transparent 60%), var(--card);
+    box-shadow: var(--shadow-1);
+    border-bottom: 1px solid rgba(0,0,0,.04);
+  }
+  h1 { color: var(--accent); letter-spacing:.2px; }
+  main {
+    max-width: 1280px;
+    margin: 32px auto 84px;
+    padding: 0 32px;
+  }
+  main section{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow: var(--shadow-1);
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+    animation: fadeInUp .5s ease both;
+    padding: 28px 32px;
+  }
+  main section:hover{ transform: translateY(-2px); box-shadow: var(--shadow-2); }
+  @keyframes fadeInUp { from{ opacity:0; transform: translateY(4px);} to{opacity:1; transform:none;} }
+
+  /* Inputs: understated & consistent (replaces prior glassy block) */
+  input[type=text], textarea, select, input[type=number] {
+    background: var(--field-bg);
+    color: var(--field-tx);
+    border: 1px solid var(--field-bd);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14.5px;
+    transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+    box-shadow: none;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  input[type=text]:hover,
+  textarea:hover,
+  select:hover,
+  input[type=number]:hover {
+    border-color: var(--field-hover);
+  }
+  input[type=text]:focus,
+  textarea:focus,
+  select:focus,
+  input[type=number]:focus,
+  input[type=text]:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  input[type=number]:focus-visible {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--field-bd) 45%);
+    box-shadow: 0 0 0 3px var(--field-focus);
+    outline: none;
+    background: color-mix(in srgb, var(--field-bg) 85%, #ffffff 15%);
+  }
+  ::placeholder {
+    color: color-mix(in srgb, var(--muted) 70%, #9fb3c8 30%);
+    opacity: .9;
+  }
+  body.dark-mode ::placeholder {
+    color: color-mix(in srgb, var(--muted) 78%, #c7d2fe 22%);
+  }
+  textarea { min-height: 110px; line-height: 1.5; resize: vertical; }
+
+  /* Select: subtle chevron (less contrasty) */
+  select {
+    appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, color-mix(in srgb, var(--muted) 70%, #000 30%) 50%),
+      linear-gradient(135deg, color-mix(in srgb, var(--muted) 70%, #000 30%) 50%, transparent 50%);
+    background-position:
+      calc(100% - 20px) calc(50% - 3px),
+      calc(100% - 14px) calc(50% - 3px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 38px;
+  }
+  body.dark-mode select {
+    background-image:
+      linear-gradient(45deg, transparent 50%, #9aa7b3 50%),
+      linear-gradient(135deg, #9aa7b3 50%, transparent 50%);
+  }
+
+  /* Labels: lighter tone + tighter weight */
+  label {
+    font-weight: 500; /* was 600 */
+    color: color-mix(in srgb, var(--text) 75%, var(--muted) 25%);
+    margin: 12px 0 6px; /* slightly tighter */
+  }
+  .row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+  } /* keep airy but not loose */
+
+  /* Toggle switch: minimal, no neon ring (replaces previous) */
+  input[type="checkbox"] {
+    appearance: none;
+    width: 42px; height: 24px;
+    border-radius: 999px;
+    background: var(--field-bg);
+    border: 1px solid var(--field-bd);
+    position: relative;
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+    box-shadow: none;
+    margin: 0 6px 0 0;
+  }
+  input[type="checkbox"]::after {
+    content: "";
+    position: absolute; top: 50%; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: color-mix(in srgb, #fff 85%, var(--card) 15%);
+    transform: translateY(-50%);
+    box-shadow: 0 1px 2px rgba(13, 27, 42, .18);
+    transition: left .22s ease, background .2s ease;
+  }
+  input[type="checkbox"]:hover { border-color: var(--field-hover); }
+  input[type="checkbox"]:checked {
+    background: color-mix(in srgb, var(--accent) 25%, var(--field-bg) 75%);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--field-bd) 55%);
+  }
+  input[type="checkbox"]:checked::after { left: 21px; }
+  input[type="checkbox"]:focus-visible { box-shadow: 0 0 0 3px var(--field-focus); }
+  body.dark-mode input[type="checkbox"]::after { background:#e6edf3; }
+
+  /* Meta chips and result */
+  .chip{ background:var(--chip-bg); color:var(--chip-fg); }
+  #resultBox{
+    background: color-mix(in srgb, var(--card) 80%, #dbeafe 20%);
+    border:1px solid color-mix(in srgb, var(--border) 70%, var(--accent) 30%);
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+
+  /* Tabs: make them pills */
+  #tabs{ 
+    display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;
+    padding:6px; border-radius:999px; background: color-mix(in srgb, var(--card) 80%, #eaf3fb 20%);
+    border:1px solid var(--border); box-shadow: var(--shadow-1);
+  }
+  #tabs > button{
+    background: transparent; color: var(--text); border-radius:999px; padding:10px 16px !important;
+    border:1px solid transparent; transition: all .2s ease;
+  }
+  #tabs > button.btn-primary{ border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+  body.dark-mode #tabs{ background: color-mix(in srgb, var(--card) 92%, #0f1b26 8%); }
+
+  /* Toasts */
+  #toasts{ position: fixed; right:18px; bottom: 18px; z-index: 2000; display:flex; flex-direction:column; gap:10px; }
+  .toast{
+    background: var(--card);
+    color: var(--text);
+    border:1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-2);
+    padding: 10px 14px;
+    font-size: 13px;
+    min-width: 220px;
+    max-width: min(440px, 90vw);
+    display:flex; align-items:center; gap:10px;
+    animation: slideIn .25s ease both;
+  }
+  .toast.error{ border-color:#ffb5b5; color:#b40000; background: #ffecec; }
+  body.dark-mode .toast.error{ background:#2a0e12; color:#ffb6b6; border-color:#5a1a20; }
+  @keyframes slideIn { from{ transform: translateY(6px); opacity:0;} to{ transform:none; opacity:1;} }
+
+  /* Keep previous dark-mode overrides in sync with variables */
+  body.dark-mode header{ box-shadow:0 2px 6px rgba(0,0,0,.6); }
+  body.dark-mode section{ box-shadow:0 3px 10px rgba(0,0,0,.5); }
+
+  /* Theme toggle button (kept from previous step) */
+  #themeToggle {
+    position:fixed; left:16px; bottom:16px; z-index:1000;
+    width:54px; height:54px; border:none; border-radius:50%;
+    cursor:pointer; outline:none;
+    background:radial-gradient(circle at 35% 35%, #ffe08a 35%, #ffb100 36%);
+    box-shadow:
+      0 6px 18px rgba(255, 177, 0, .35),
+      inset 0 -2px 6px rgba(0,0,0,.15);
+    display:grid; place-items:center;
+    transition:transform .5s cubic-bezier(.2,.8,.2,1), box-shadow .3s;
+  }
+  #themeToggle:hover { transform:rotate(12deg) scale(1.04); }
+  #themeToggle:active { transform:rotate(18deg) scale(0.98); }
+  #themeToggle:focus-visible { outline:2px solid #0a66c2; outline-offset:3px; }
+
+  /* Inner icon morph: sun -> moon */
+  #themeToggle .icon {
+    width:22px; height:22px; border-radius:50%;
+    background:radial-gradient(circle at 35% 35%, #ffffff 30%, #ffe08a 31%);
+    box-shadow: 0 0 22px rgba(255, 224, 138, .9), 0 0 60px rgba(255, 177, 0, .5);
+    position:relative;
+    transition:all .45s ease;
+  }
+  #themeToggle .icon::after {
+    content:""; position:absolute; inset:0; border-radius:50%;
+    background:transparent;
+    /* for crescent cutout in dark mode */
+    transform:translate(8px,-8px);
+    transition:all .45s ease;
+  }
+
+  /* Dark mode button look */
+  body.dark-mode #themeToggle {
+    background:radial-gradient(circle at 60% 40%, #0f1419 40%, #0b0f14 41%);
+    box-shadow:
+      0 8px 22px rgba(0,0,0,.6),
+      inset 0 -2px 8px rgba(255,255,255,.04);
+  }
+  body.dark-mode #themeToggle .icon {
+    background:#e6edf3;
+    box-shadow: 0 0 14px rgba(230, 237, 243, .45);
+  }
+  body.dark-mode #themeToggle .icon::after {
+    background:#0f1419; /* creates the crescent */
+  }
+
+  /* DM Assistant: centered layout + floating labels */
+  .dm-wrap { max-width: 900px; margin: 0 auto; } /* was 1100px */
+  .dm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px; /* was 16px */
+    align-items: start;
+  }
+  .dm-actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+
+  .float-field { position: relative; }
+  .float-field textarea {
+    padding-top: 28px; /* room for the label inside */
+  }
+  .float-field label {
+    position: absolute;
+    left: 12px;
+    top: 10px;
+    font-size: 12px;
+    color: color-mix(in srgb, var(--muted) 70%, #9fb3c8 30%);
+    pointer-events: none;
+    transition: transform .18s ease, color .18s ease, opacity .18s ease, top .18s ease;
+    padding: 0 6px;
+    background: var(--card);
+    border-radius: 6px;
+    opacity: .95;
+  }
+  .float-field textarea:focus + label,
+  .float-field textarea:not(:placeholder-shown) + label {
+    top: 6px;
+    color: color-mix(in srgb, var(--accent) 55%, var(--muted) 45%);
+    opacity: 1;
+  }
+  body.dark-mode .float-field label { background: var(--card); }
+
+  /* Utility */
+  .hidden { display: none !important; }
+
+  /* Buttons: base + outline + danger */
+  button:not(#themeToggle) {
+    background: color-mix(in srgb, var(--card) 92%, #eaf3fb 8%);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-weight: 600;
+    transition: transform .12s ease, box-shadow .2s ease, border-color .2s ease, filter .2s ease, background .2s ease;
+    cursor: pointer;
+  }
+  button:not(#themeToggle):hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-1);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--accent) 30%);
+  }
+  button:not(#themeToggle):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow-1); /* was var(--shadow-) */
+  }
+  button:not(#themeToggle):active { transform: translateY(0); filter: brightness(.98); }
+
+  /* Primary (gradient) */
+  .btn-primary{
+    background: var(--grad);
+    color:#fff;
+    border: 0;
+    border-radius: 10px;
+    padding: 12px 18px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 6px 16px rgba(10,102,194,.25);
+    transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
+  }
+  .btn-primary::after{
+    content:"";
+    position:absolute; inset:0;
+    background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,.35) 50%, transparent 100%);
+    transform: translateX(-120%);
+    transition: transform .6s ease;
+    pointer-events:none;
+  }
+  .btn-primary:hover{ transform: translateY(-1px); box-shadow: 0 10px 24px rgba(10,102,194,.32); }
+  .btn-primary:hover::after{ transform: translateX(120%); }
+  .btn-primary:focus-visible{ outline:none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent), 0 6px 16px rgba(10,102,194,.25); }
+  .btn-primary:active{ transform: translateY(0); filter: brightness(.98); }
+
+  /* Outline and danger keep previous look in sync with base buttons */
+  .btn-outline{
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--border) 85%, var(--accent) 15%);
+    color: var(--text);
+  }
+  .btn-danger{
+    background: linear-gradient(135deg, #b00020, #d22d2d);
+    color:#fff;
+    border: 0;
+    box-shadow: 0 6px 16px rgba(208, 51, 51, .25);
+  }
+  .btn-danger:hover{ box-shadow: 0 10px 24px rgba(208, 51, 51, .35); }
+
+  /* Center Target Audience field (override earlier left nudge) */
+  #generator label[for="audience"],
+  #generator #audience {
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  #generator label[for="audience"]{
+    display: block;
+    max-width: 560px;         /* narrower than section width */
+    text-align: left;         /* keep label text left-aligned */
+    margin-bottom: 6px;      /* small bottom space to input */
+  }
+  #generator #audience{
+    display: block;          /* required so auto margins center it */
+    max-width: 560px;         /* input width constrained, stays centered */
+  }
+
+  /* Nudge Target Audience a bit right */
+  label[for="audience"], #audience { margin-left: 12px; }
+
+  /* Keep generator and DM inputs centered */
+  #generator > *:not(h2), #generator .row { max-width: 900px; margin-left:auto; margin-right:auto; }
+  .dm-wrap { max-width: 900px; margin: 0 auto; }
+
+  /* Draft cards: base readability */
+  .draft-card {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+  }
+  .draft-card h4 { color: var(--text); margin: 0 0 6px; }
+  .draft-card .draft-body {
+    /* inline style sets bg + border; keep light mode defaults */
+    color: #0b1520; /* ensure dark text on light body in light mode */
+  }
+
+  /* Dark mode: force high-contrast for drafts list */
+  body.dark-mode .draft-card {
+    background: color-mix(in srgb, var(--card) 92%, #0b1320 8%);
+    border-color: color-mix(in srgb, var(--border) 85%, #0a66c2 15%);
+  }
+  body.dark-mode .draft-card .draft-body {
+    background: color-mix(in srgb, var(--card) 90%, #0b1320 10%) !important;
+    border-color: color-mix(in srgb, var(--border) 86%, #ffffff 14%) !important;
+    color: var(--text) !important;
+  }
+  body.dark-mode #draftList .countdown { color: var(--muted); }
+
+  /* DM history cards: override light inline backgrounds in dark mode */
+  body.dark-mode #dmAssistant .draft-card {
+    background: color-mix(in srgb, var(--card) 90%, #0b1320 10%) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+  }
+  body.dark-mode #dmAssistant .draft-card h4 { color: var(--text) !important; }
+
+  /* Next-run notice styling */
+  #draftNotice {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--card) 88%, #eaf3fb 12%);
+    color: var(--text);
+    font-size: 13px;
+  }
+  body.dark-mode #draftNotice {
+    background: color-mix(in srgb, var(--card) 90%, #0b1320 10%);
+    border-color: color-mix(in srgb, var(--border) 85%, #ffffff 15%);
+  }
+
+  /* Admin panel minor styles */
+  #adminTab .row { margin-top: 10px; }
+  #adminTab code { background: color-mix(in srgb, var(--card) 88%, #eaf3fb 12%); padding:2px 6px; border-radius:6px; }
+  body.dark-mode #adminTab code { background: color-mix(in srgb, var(--card) 90%, #0b1320 10%); }
+</style>
+</head>
+<body>
+<header>
+  <h1>LinkedIn Viral Post Generator</h1>
+  <p style="margin-top:8px; color:#555;">Create engaging posts + auto drafts with delayed publish</p>
+</header>
+<main>
+  <!-- Submenu tabs -->
+  <div id="tabs" class="flex" style="margin:10px 0 20px;">
+    <button id="tabPostsBtn" class="btn-primary" style="padding:8px 14px;font-size:13px;" onclick="showTab('generator')">Posts</button>
+    <button id="tabDraftsBtn" style="padding:8px 14px;font-size:13px;" onclick="showTab('drafts')">Drafts</button>
+    <button id="tabDmBtn" style="padding:8px 14px;font-size:13px;" onclick="showTab('dmAssistant')">DM Assistant</button>
+    <button id="tabProfileBtn" style="padding:8px 14px;font-size:13px;" onclick="showTab('profile')">Profile</button>
+    <!-- Admin tab button: hidden by default; shown only for allowed user -->
+    <button id="tabAdminBtn" style="padding:8px 14px;font-size:13px; display:none;" onclick="showTab('adminTab')">Admin</button>
+  </div>
+
+  <section id="generator">
+    <h2 style="margin-top:0;">Generate Post</h2>
+    <div class="row">
+      <div>
+        <label for="template_id">Template</label>
+        <select id="template_id"></select>
+      </div>
+      <div>
+        <label for="tone">Tone</label>
+        <select id="tone">
+          <option value="candid">Candid</option><option value="professional">Professional</option>
+          <option value="conversational">Conversational</option><option value="authoritative">Authoritative</option>
+          <option value="humorous">Humorous</option>
+        </select>
+      </div>
+      <div>
+        <label for="goal">Goal</label>
+        <select id="goal">
+          <option value="leadgen">Lead Generation</option><option value="engagement">Engagement</option>
+          <option value="awareness">Brand Awareness</option><option value="thought-leadership">Thought Leadership</option>
+        </select>
+      </div>
+      <div>
+        <label for="temperature">Creativity</label>
+        <input id="temperature" type="number" min="0" max="1" value="0.7" step="0.1">
+      </div>
+    </div>
+    <label for="audience">Target Audience</label>
+    <input id="audience" type="text" placeholder="e.g. SaaS founders who hate marketing">
+
+    <!-- Replace flat labels with floating-label textareas -->
+    <div class="float-field" style="margin-top:8px;">
+      <textarea id="key_facts" placeholder=" "></textarea>
+      <label for="key_facts">Key Facts</label>
+    </div>
+    <div class="float-field" style="margin-top:8px;">
+      <textarea id="personal_detail" placeholder=" "></textarea>
+      <label for="personal_detail">Personal Detail (experience / tone hints)</label>
+    </div>
+
+    <div class="actions">
+      <button id="btnGenerate" class="btn-primary">Generate Post</button>
+      <span id="loading" class="hidden">Generating…</span>
+    </div>
+    <div id="errorBox" class="error hidden"></div>
+    <div id="resultWrap" class="hidden">
+      <h3 style="margin-top:28px;">Result</h3>
+      <div id="resultBox"></div>
+      <div class="meta" id="hooksBox"></div>
+      <div class="meta" id="hashtagsBox"></div>
+      <div id="tldrBox" style="margin-top:10px;font-size:14px;font-style:italic;"></div>
+    </div>
+  </section>
+
+  <section id="drafts">
+    <h2 style="margin-top:0;">Auto Drafts</h2>
+    <label for="key_points" style="font-weight:600; display:block; margin:0 0 6px;">Key Points (used by AI)</label>
+    <textarea id="key_points" placeholder="e.g. SaaS founder; ex-Stripe; building PLG analytics; topics: GTM, PLG, shipping velocity" style="width:100%;padding:11px 12px;border:2px solid #d9e2e8;border-radius:8px;font-size:14px;min-height:80px;resize:vertical;"></textarea>
+    <div class="flex" style="margin-top:8px;">
+      <button id="btnSaveKeyPoints" style="padding:8px 12px;font-size:13px;">Save Key Points</button>
+      <span id="keyPointsStatus" style="font-size:12px;color:#444;"></span>
+    </div>
+
+    <!-- Auto settings -->
+    <div class="row" style="margin-top:10px;">
+      <div>
+        <label for="autoPerDay">Posts per day (max 5)</label>
+        <select id="autoPerDay">
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+        </select>
+      </div>
+      <div>
+        <label for="autoWinStart">Preferred window start</label>
+        <input id="autoWinStart" type="time" value="09:00">
+      </div>
+      <div>
+        <label for="autoWinEnd">Preferred window end</label>
+        <input id="autoWinEnd" type="time" value="17:00">
+      </div>
+    </div>
+    <div class="flex" style="margin-top:8px;">
+      <button id="btnSaveAuto" style="padding:8px 12px;font-size:13px;">Save Auto Settings</button>
+      <span id="autoSettingsStatus" style="font-size:12px;color:#444;"></span>
+    </div>
+
+    <div class="flex" style="margin-top:14px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:14px;">
+        <input type="checkbox" id="autoToggle"> Enable auto-generate drafts
+      </label>
+      <button id="btnManualDraft" class="btn-primary" style="padding:10px 18px;font-size:13px;">Generate Draft Now</button>
+      <button id="btnRefreshDrafts" style="padding:10px 18px;font-size:13px;">Refresh</button>
+    </div>
+    <div class="notice" id="draftNotice" style="display:none;"></div>
+    <div id="draftList" class="drafts" style="margin-top:16px;"></div>
+  </section>
+
+  <!-- New: DM Assistant -->
+  <section id="dmAssistant" style="display:none;">
+    <h2 style="margin-top:0; text-align:center;">DM Assistant (AI)</h2>
+
+    <div class="dm-wrap">
+      <!-- DM Context with floating label -->
+      <div class="float-field" style="margin-bottom:10px;">
+        <textarea id="dmContext" placeholder=" "></textarea>
+        <label for="dmContext">DM Context</label>
+      </div>
+
+      <!-- Two-column grid for inbound and suggestion -->
+      <div class="dm-grid" style="margin-top:8px;">
+        <div class="float-field">
+          <textarea id="dmInbound" placeholder=" "></textarea>
+          <label for="dmInbound">Their latest message</label>
+        </div>
+        <div class="float-field">
+          <textarea id="dmSuggestion" placeholder=" " readonly></textarea>
+          <label for="dmSuggestion">Suggested reply</label>
+        </div>
+      </div>
+
+      <!-- Actions centered -->
+      <div class="dm-actions" style="margin-top:12px;">
+        <button id="btnDmSuggest" class="btn-primary" style="padding:10px 18px;font-size:13px;">Suggest Reply</button>
+        <button id="btnDmAccept" style="padding:10px 18px;font-size:13px;">Accept to Thread</button>
+        <button id="btnDmCopy" style="padding:10px 18px;font-size:13px;">Copy</button>
+        <button id="btnDmReset" style="padding:10px 18px;font-size:13px;">Reset Thread</button>
+        <span id="dmStatus" style="font-size:12px;color:#444;align-self:center;"></span>
+      </div>
+
+      <div id="dmHistory" class="drafts" style="margin-top:12px;"></div>
+    </div>
+  </section>
+
+  <!-- Profile (now includes sign-in; no key points here) -->
+  <section id="profile" style="display:none;">
+    <h2 style="margin-top:0;">Profile</h2>
+
+    <!-- Moved Auth bar into Profile -->
+    <div id="authBar" class="flex" style="margin:0 0 12px;gap:8px;">
+      <input id="authEmail" type="text" placeholder="email" style="padding:8px 10px;border:1px solid #d9e2e8;border-radius:6px;min-width:220px;">
+      <input id="authPassword" type="password" placeholder="password" style="padding:8px 10px;border:1px solid #d9e2e8;border-radius:6px;min-width:160px;">
+      <button id="btnRegister" class="btn" style="padding:8px 12px;">Register</button>
+      <button id="btnLogin" class="btn-primary" style="padding:8px 12px;">Login</button>
+      <button id="btnLogout" class="btn btn-outline" style="display:none;padding:8px 12px;">Logout</button>
+      <span id="authStatus" style="font-size:12px;color:#444;"></span>
+    </div>
+
+    <!-- Added: login gate notice -->
+    <div id="profileGate" class="notice">Please log in to access your profile settings.</div>
+
+    <!-- Wrap all profile fields in a gated container -->
+    <div id="profileContent" style="display:none;">
+      <div class="row">
+        <div>
+          <label for="display_name">Display Name</label>
+          <input id="display_name" type="text" placeholder="Your name as shown in app">
+        </div>
+        <div>
+          <!-- replaced email read-only with notifications toggle -->
+          <label for="notify_on_draft">Notifications</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input id="notify_on_draft" type="checkbox">
+            <span>Email me when a draft is created</span>
+          </div>
+        </div>
+      </div>
+      <label for="about_me">About Me</label>
+      <textarea id="about_me" placeholder="Short bio, background, what you care about"></textarea>
+
+      <!-- Added: LinkedIn Connect inside Profile -->
+      <div style="margin-top:12px;">
+        <h3 style="margin:10px 0 8px;font-size:16px;">LinkedIn</h3>
+        <div class="flex">
+          <button id="btnLinkedInConnect" class="btn-primary" style="background:#0a66c2;">Connect LinkedIn</button>
+          <button id="btnLinkedInDisconnect" style="display:none;padding:10px 18px;font-size:13px;background:#b20000;color:#fff;">Disconnect</button>
+          <span id="linkedinStatus" style="font-size:12px;color:#444;"></span>
+        </div>
+      </div>
+
+      <div class="flex" style="margin-top:8px;">
+        <button id="btnSaveProfile" class="btn-primary" style="padding:8px 12px;font-size:13px;">Save Profile</button>
+        <span id="profileStatus" style="font-size:12px;color:#444;"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Admin Panel (only for user u_hIzmTrmmvrA) -->
+  <section id="adminTab" style="display:none;">
+    <h2 style="margin-top:0;">Admin</h2>
+    <p style="margin:0 0 8px;font-size:13px;color:var(--muted);">Adjust auto-generate schedule for testing.</p>
+
+    <div class="row">
+      <div>
+        <label for="adminUserId">Target User ID</label>
+        <input id="adminUserId" type="text" readonly>
+      </div>
+      <div>
+        <label for="adminToken">Admin Token (optional)</label>
+        <input id="adminToken" type="text" placeholder="X-Admin-Token (saved locally)">
+      </div>
+    </div>
+    <div class="flex" style="margin-top:8px; gap:8px; flex-wrap:wrap;">
+      <button id="btnSaveAdminToken" style="padding:8px 12px;font-size:13px;">Save Token</button>
+      <span id="adminTokenStatus" style="font-size:12px;color:#444;"></span>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <div>
+        <label for="adminNextRunAt">Set Next Run At (UTC)</label>
+        <input id="adminNextRunAt" type="datetime-local">
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <div class="flex" style="gap:8px;flex-wrap:wrap;">
+          <button id="btnAdminSetNext" class="btn-primary" style="padding:8px 12px;font-size:13px;">Set</button>
+          <button id="btnAdminPlus30s" style="padding:8px 12px;font-size:13px;">+30s</button>
+          <button id="btnAdminPlus1m" style="padding:8px 12px;font-size:13px;">+1m</button>
+          <button id="btnAdminPlus5m" style="padding:8px 12px;font-size:13px;">+5m</button>
+          <button id="btnAdminRefresh" style="padding:8px 12px;font-size:13px;">Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="adminState" class="drafts" style="margin-top:12px;"></div>
+  </section>
+</main>
+
+<!-- Floating Theme Toggle -->
+<button id="themeToggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+  <span class="icon" aria-hidden="true"></span>
+</button>
+
+<!-- Toast container -->
+<div id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// Ensure escapeHtml exists before any draft rendering
+if (typeof window.escapeHtml !== 'function') {
+  const _escMap = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":"&#39;" };
+  window.escapeHtml = function(str){
+    return String(str == null ? '' : str).replace(/[&<>"']/g, ch => _escMap[ch]);
+  };
+}
+
+// Ensure toggleExpand exists for draft card expand/collapse
+if (typeof window.toggleExpand !== 'function') {
+  window.toggleExpand = function(id){
+    const el = document.getElementById('body-'+id);
+    if (!el) return;
+    const isCollapsed = el.style.maxHeight && el.style.maxHeight !== 'none';
+    if (isCollapsed){
+      el.style.maxHeight = 'none';
+      el.style.overflow = 'auto';
+    } else {
+      el.style.maxHeight = '260px';
+      el.style.overflow = 'hidden';
+    }
+  };
+}
+
+// NEW: Ensure updateCountdowns exists globally before renderDrafts uses it
+if (typeof window.updateCountdowns !== 'function') {
+  window.updateCountdowns = function(){
+    document.querySelectorAll('.draft-card').forEach(card => {
+      const id = card.getAttribute('data-id');
+      const publishAttr = card.getAttribute('data-publish');
+      if (!publishAttr) return;
+      const publish = new Date(publishAttr).getTime();
+      const diff = publish - Date.now();
+      const el = document.getElementById('cd-' + id);
+      if (!el) return;
+      if (isNaN(publish)) {
+        el.textContent = 'Unknown schedule';
+        return;
+      }
+      if (diff <= 0) {
+        el.textContent = 'Publishing soon...';
+      } else {
+        const m = Math.floor(diff / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        el.textContent = `Auto-post in ${m}m ${s}s`;
+      }
+    });
+  };
+}
+
+// Unified auth headers (Bearer + legacy X-User-Id)
+function authHeaders(){
+  const h = {};
+  const t = localStorage.getItem('authToken');
+  if (t) h['Authorization'] = 'Bearer ' + t;
+  // keep legacy header for compatibility
+  h['X-User-Id'] = localStorage.getItem('demoUserId') || (() => {
+    const v='user_'+Math.random().toString(36).slice(2,8); localStorage.setItem('demoUserId',v); return v;
+  })();
+  return h;
+}
+
+// --- Auth UI logic ---
+function isLoggedIn(){ return !!localStorage.getItem('authToken'); }
+function updateAuthUI(){
+  const email = localStorage.getItem('authEmail');
+  if(isLoggedIn()){
+    $('authEmail').style.display='none';
+    $('authPassword').style.display='none';
+    $('btnRegister').style.display='none';
+    $('btnLogin').style.display='none';
+    $('btnLogout').style.display='inline-block';
+    $('authStatus').textContent = email ? `Logged in as ${email}` : 'Logged in';
+  } else {
+    $('authEmail').style.display='inline-block';
+    $('authPassword').style.display='inline-block';
+    $('btnRegister').style.display='inline-block';
+    $('btnLogin').style.display='inline-block';
+    $('btnLogout').style.display='none';
+    $('authStatus').textContent = 'Not logged in';
+  }
+  // Also toggle gated profile access
+  updateProfileAccess();
+  // Ensure we learn the real user_id after login and update Admin tab
+  ensureAdminUser();
+}
+
+// Added: toggle profile access based on login
+function updateProfileAccess(){
+  const logged = isLoggedIn();
+  const content = $('profileContent');
+  const gate = $('profileGate');
+  if (content) content.style.display = logged ? 'block' : 'none';
+  if (gate) gate.style.display = logged ? 'none' : 'block';
+  // Also refresh auto-generate toggle state on any auth UI change
+  try { loadAutoStatus(); } catch {}
+}
+
+// Admin visibility for a single user
+const ADMIN_USER_ID = 'u_hIzmTrmmvrA';
+function currentUserId(){
+  return localStorage.getItem('authUserId') || (localStorage.getItem('demoUserId') || '');
+}
+function updateAdminVisibility(){
+  const isAdmin = currentUserId() === ADMIN_USER_ID;
+  const btn = $('tabAdminBtn');
+  const sec = $('adminTab');
+  if (btn) btn.style.display = isAdmin ? 'inline-block' : 'none';
+  if (sec) sec.style.display = (isAdmin && btn.classList.contains('btn-primary')) ? 'block' : sec.style.display;
+  if (isAdmin) {
+    // Prefill fields
+    if ($('adminUserId')) $('adminUserId').value = ADMIN_USER_ID;
+    // Load saved token
+    try{
+      const tok = localStorage.getItem('adminToken') || '';
+      if ($('adminToken')) $('adminToken').value = tok;
+    }catch{}
+  }
+}
+
+// NEW: fetch /api/me to persist the real user_id and refresh Admin gating
+async function ensureAdminUser(){
+  try{
+    const r = await fetch('/api/me', { headers: authHeaders() });
+    if(!r.ok) return;
+    const d = await r.json();
+    if(d && d.user_id){
+      try { localStorage.setItem('authUserId', d.user_id); } catch {}
+      // Prefill admin target if empty
+      if ($('adminUserId') && !$('adminUserId').value) $('adminUserId').value = d.user_id;
+      updateAdminVisibility();
+    }
+  }catch(e){ /* silent */ }
+}
+
+// Admin headers + helpers
+function adminHeaders(){
+  const h = { ...authHeaders() };
+  const tok = $('adminToken')?.value || localStorage.getItem('adminToken') || '';
+  if (tok) h['X-Admin-Token'] = tok;
+  return h;
+}
+function adminLocalSaveToken(){
+  try{
+    const tok = $('adminToken')?.value || '';
+    if (tok) localStorage.setItem('adminToken', tok);
+    else localStorage.removeItem('adminToken');
+    $('adminTokenStatus').textContent = 'Token saved';
+    setTimeout(()=> $('adminTokenStatus').textContent = '', 1500);
+  }catch(e){}
+}
+
+// Next auto-gen countdown
+let _nextAutoAt = null;
+let _nextTimerInt = null;
+function setNextRunCountdown(iso) {
+  _nextAutoAt = iso ? new Date(iso) : null;
+  renderNextRun();
+  if (_nextTimerInt) clearInterval(_nextTimerInt);
+  if (_nextAutoAt) _nextTimerInt = setInterval(renderNextRun, 1000);
+}
+function renderNextRun() {
+  const el = $('draftNotice');
+  if (!el) return;
+  if (!_nextAutoAt) {
+    el.style.display = 'none';
+    el.textContent = '';
+    return;
+  }
+  const diff = _nextAutoAt.getTime() - Date.now();
+  el.style.display = 'block';
+  if (isNaN(_nextAutoAt.getTime())) {
+    el.textContent = 'Next auto-gen: schedule unknown';
+    return;
+  }
+  if (diff <= 0) {
+    el.textContent = 'Next auto-gen: soon';
+    return;
+  }
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  const hPart = h > 0 ? `${h}h ` : '';
+  el.textContent = `Next auto-gen in ${hPart}${m}m ${s}s`;
+}
+
+// Load auto config (works without login via X-User-Id)
+async function loadAutoSettings(){
+  try{
+    const r = await fetch('/api/me', { headers: authHeaders() });
+    if(!r.ok) return;
+    const d = await r.json();
+    if ($('autoPerDay')) $('autoPerDay').value = String(d.auto_posts_per_day || 1);
+    if ($('autoWinStart') && d.auto_window_start) $('autoWinStart').value = d.auto_window_start;
+    if ($('autoWinEnd') && d.auto_window_end) $('autoWinEnd').value = d.auto_window_end;
+  }catch(e){ /* silent */ }
+}
+
+async function saveAutoSettings(){
+  const perDay = parseInt(($('autoPerDay')?.value || '1'), 10);
+  const start = $('autoWinStart')?.value || '';
+  const end = $('autoWinEnd')?.value || '';
+  const status = $('autoSettingsStatus');
+  if (status) status.textContent = 'Saving...';
+  try{
+    const r = await fetch('/api/me',{
+      method:'POST',
+      headers:{'Content-Type':'application/json', ...authHeaders()},
+      body: JSON.stringify({
+        auto_posts_per_day: Math.max(1, Math.min(5, perDay|0)),
+        auto_window_start: start || null,
+        auto_window_end: end || null
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Save failed');
+    if (status) status.textContent = 'Saved';
+    // update countdown if server recomputed next_run
+    loadAutoStatus();
+  }catch(e){
+    if (status) status.textContent = 'Save error: ' + e.message;
+  }
+}
+$('btnSaveAuto')?.addEventListener('click', saveAutoSettings);
+
+// NEW: Save Key Points handler
+async function saveKeyPoints(){
+  const status = $('keyPointsStatus');
+  const btn = $('btnSaveKeyPoints');
+  if (status) status.textContent = 'Saving...';
+  if (btn) btn.disabled = true;
+  try{
+    const kp = $('key_points')?.value || '';
+    const r = await fetch('/api/me', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ key_points: kp })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Save failed');
+    if (status) status.textContent = 'Saved';
+    setTimeout(()=>{ if (status) status.textContent=''; }, 1500);
+    // Refresh profile to reflect persisted value
+    loadProfile();
+  }catch(e){
+    if (status) status.textContent = 'Save error: ' + e.message;
+    setTimeout(()=>{ if (status) status.textContent=''; }, 2000);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Fetch and reflect saved auto-generate state (works without login via X-User-Id)
+async function loadAutoStatus(){
+  try{
+    const r = await fetch('/api/drafts/auto-generate-status', { headers: authHeaders() });
+    if (!r.ok) return;
+    const d = await r.json();
+    if ($('autoToggle')) $('autoToggle').checked = !!d.enabled;
+    setNextRunCountdown(d.next_run_at || null);
+    // Optionally use d.posts_per_day, d.window_start/_end to prefill if empty
+    if ($('autoPerDay') && !$('autoPerDay').value) $('autoPerDay').value = String(d.posts_per_day || 1);
+    if ($('autoWinStart') && d.window_start) $('autoWinStart').value = d.window_start;
+    if ($('autoWinEnd') && d.window_end) $('autoWinEnd').value = d.window_end;
+  }catch(e){
+    // silent
+  }
+}
+
+// --- Templates & generator ---
+async function loadTemplates(){
+  try{
+    const r = await fetch('/templates');
+    const data = await r.json();
+    const sel = $('template_id');
+    sel.innerHTML = '';
+    data.templates.forEach(t=>{
+      const o=document.createElement('option');
+      o.value=t.id; o.textContent=t.name || t.id;
+      sel.appendChild(o);
+    });
+  }catch(e){ showError('Failed to load templates: '+e.message); }
+}
+
+function showError(msg){
+  $('errorBox').classList.remove('hidden');
+  $('errorBox').textContent = msg;
+  setTimeout(()=> $('errorBox').classList.add('hidden'), 7000);
+}
+
+$('btnGenerate').addEventListener('click', async ()=>{
+  // Removed user_context; back-end pulls key_points from profile
+  const basePersonal = $('personal_detail').value.trim();
+  const payload = {
+    template_id: $('template_id').value,
+    tone: $('tone').value,
+    audience: $('audience').value,
+    goal: $('goal').value,
+    key_facts: $('key_facts').value,
+    personal_detail: basePersonal,
+    temperature: parseFloat($('temperature').value || '0.7')
+  };
+  $('btnGenerate').disabled = true;
+  $('loading').classList.remove('hidden');
+  try{
+    const r = await fetch('/generate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json', ...authHeaders()},
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.detail || 'Generation failed');
+    renderResult(data);
+  }catch(e){ showError(e.message); }
+  finally{
+    $('btnGenerate').disabled=false;
+    $('loading').classList.add('hidden');
+  }
+});
+
+function renderResult(data){
+  $('resultWrap').classList.remove('hidden');
+  $('resultBox').textContent = data.post || '';
+  $('hooksBox').innerHTML = (data.hooks||[]).map(h=>`<span class="chip">${h}</span>`).join('');
+  $('hashtagsBox').innerHTML = (data.hashtags||[]).map(h=>`<span class="chip">#${h}</span>`).join('');
+  $('tldrBox').textContent = 'TL;DR: '+ (data['tl;dr'] || data.tl_dr || '');
+}
+
+/* Drafts */
+$('autoToggle').addEventListener('change', ()=> toggleAuto($('autoToggle').checked));
+$('btnManualDraft').addEventListener('click', manualDraft);
+$('btnRefreshDrafts').addEventListener('click', loadDrafts);
+
+async function toggleAuto(enabled){
+  try{
+    const r=await fetch('/api/drafts/auto-generate-toggle',{
+      method:'POST',
+      headers:{'Content-Type':'application/json', ...authHeaders()},
+      body: JSON.stringify({ enabled })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.detail||'Toggle failed');
+    if(data.generated_draft_id) window.notify && window.notify('Generated draft '+data.generated_draft_id.slice(0,8));
+    if(data.notice) window.notify && window.notify(data.notice);
+    setNextRunCountdown(data.next_run_at || null);
+    loadAutoStatus();
+    loadDrafts();
+  }catch(e){
+    window.notify && window.notify('Auto toggle failed: '+e.message,true);
+    $('autoToggle').checked = !enabled;
+    setNextRunCountdown(null);
+  }
+}
+
+// After manual draft creation, append immediately for responsiveness
+async function manualDraft(){
+  try{
+    const basePersonal = $('personal_detail').value.trim();
+    const r=await fetch('/api/drafts/generate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json', ...authHeaders()},
+      body: JSON.stringify({
+        template_id: $('template_id').value,
+        personal_detail: basePersonal
+      })
+    });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.detail||'Generate failed');
+    window.notify && window.notify('Draft created.');
+    // Optimistic add
+    if(data.draft){
+      const draft = normalizeDraft(data.draft);
+      const existing = document.querySelectorAll('.draft-card').length;
+      if(existing === 0){
+        $('draftList').innerHTML = '';
+      }
+      $('draftList').insertAdjacentHTML('afterbegin', draftCard(draft));
+      updateCountdowns();
+    }
+    // Also refresh from server to ensure sync
+    loadDrafts();
+  }catch(e){
+    window.notify && window.notify(e.message,true);
+  }
+}
+
+async function loadDrafts(){
+  try{
+    const r=await fetch('/api/drafts/pending',{headers: authHeaders()});
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.detail||'Load failed');
+    renderDrafts(data.pending||[]);
+  }catch(e){ window.notify && window.notify('Load drafts error: '+e.message,true); }
+}
+
+function renderDrafts(list){
+  try{
+    if(!list.length){
+      $('draftList').innerHTML = '<em style="font-size:13px;">No pending drafts</em>';
+      return;
+    }
+    $('draftList').innerHTML = list.map(d=>draftCard(normalizeDraft(d))).join('');
+    updateCountdowns();
+    if(window._cdInt) clearInterval(window._cdInt);
+    window._cdInt = setInterval(updateCountdowns,1000);
+  }catch(err){
+    console.error('[Drafts] render error', err, list);
+    $('draftList').innerHTML = '<div style="color:#b00;font-size:12px;">Render error – see console.</div>';
+  }
+}
+
+function normalizeDraft(d){
+  // Ensure content field exists for UI
+  if(!d.content){
+    d.content = d.post || d.text || '(empty)';
+  }
+  if(!d.publish_at && d.publishAt) d.publish_at = d.publishAt;
+  return d;
+}
+
+function draftCard(d){
+  const body = d.content || '(empty)';
+  const long = body.length > 1200;
+  const safe = escapeHtml(body);
+  const title = d.title || (body.slice(0,50)+'...');
+  return `
+  <div class="draft-card" data-id="${d.id}" data-publish="${d.publish_at || ''}">
+    <h4>${escapeHtml(title)}</h4>
+    <div class="draft-body" id="body-${d.id}" style="font-size:13px;white-space:pre-wrap;max-height:${long?'260px':'auto'};overflow:${long?'hidden':'auto'};border:1px solid #eef2f4;padding:8px;border-radius:6px;background:#fcfeff;">
+      ${safe}
+    </div>
+    ${long ? `<button style="margin-top:6px;padding:4px 10px;font-size:11px;" onclick="toggleExpand('${d.id}')">Expand</button>` : ''}
+    <div class="countdown" id="cd-${d.id}"></div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button style="padding:6px 12px;font-size:12px;" onclick="editDraftPrompt('${d.id}')">Edit</button>
+      <button style="padding:6px 12px;font-size:12px;" onclick="cancelDraft('${d.id}')">Cancel</button>
+      <button style="padding:6px 12px;font-size:12px;" onclick="postNow('${d.id}')">Post Now</button>
+    </div>
+    <div class="linkedin">
+      ${d.meta && d.meta.linkedin_post_urn ? 'LinkedIn: posted ('+d.meta.linkedin_post_urn.split(':').pop().slice(0,8)+'...)'
+        : 'Status: '+(d.status||'pending')}
+    </div>
+  </div>`;
+}
+
+async function editDraftPrompt(id){
+  const original = document.querySelector(`.draft-card[data-id="${id}"]`);
+  if(!original) return;
+  const existing = original.querySelector('div[style*="white-space"]')?.innerText || '';
+  const content = prompt('Edit draft content:', existing.replace(/…$/,''));
+  if(content===null) return;
+  try{
+    const r=await fetch(`/api/drafts/${id}/edit`,{
+      method:'POST', headers:{'Content-Type':'application/json', ...authHeaders()},
+      body: JSON.stringify({ content })
+    });
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.detail||'Edit failed');
+    window.notify && window.notify('Draft updated.');
+    loadDrafts();
+  }catch(e){ window.notify && window.notify(e.message,true); }
+}
+
+async function cancelDraft(id){
+  if(!confirm('Cancel auto-post for this draft?')) return;
+  try{
+    const r=await fetch(`/api/drafts/${id}/cancel`,{method:'POST',headers: authHeaders()});
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.detail||'Cancel failed');
+    window.notify && window.notify('Draft cancelled.');
+    loadDrafts();
+  }catch(e){ window.notify && window.notify(e.message,true); }
+}
+
+async function postNow(id){
+  if(!confirm('Publish this draft now?')) return;
+  try{
+    const r=await fetch(`/api/drafts/${id}/post-now`,{method:'POST',headers: authHeaders()});
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.detail||'Publish failed');
+    window.notify && window.notify('Draft posted.');
+    loadDrafts();
+  }catch(e){ window.notify && window.notify(e.message,true); }
+}
+
+/* LinkedIn */
+$('btnLinkedInConnect').addEventListener('click', connectLinkedIn);
+$('btnLinkedInDisconnect').addEventListener('click', disconnectLinkedIn);
+
+async function connectLinkedIn(){
+  const userId = localStorage.getItem('authUserId') || authHeaders()['X-User-Id'];
+  const popupUrl = `/api/linkedin/connect?popup=1&u=${encodeURIComponent(userId)}`;
+  const w=640,h=780;
+  const y = window.screenY + Math.max(0,(window.outerHeight - h)/2);
+  const x = window.screenX + Math.max(0,(window.outerWidth - w)/2);
+  const features = `width=${w},height=${h},left=${x},top=${y},menubar=0,toolbar=0,location=0,status=0,resizable=1,scrollbars=1`;
+  const win = window.open(popupUrl,'linkedin_oauth_popup',features);
+  if(!win){
+    window.notify && window.notify('Popup blocked. Allow popups and retry.', true);
+    return;
+  }
+  window._liPopup = win;
+  $('linkedinStatus').textContent = 'Popup opened… complete LinkedIn auth';
+  // Fallback poll: if callback closes without postMessage
+  const poll = setInterval(()=>{
+    if(!window._liPopup || window._liPopup.closed){
+      clearInterval(poll);
+      loadLinkedInStatus();
+    }
+  }, 800);
+}
+
+async function disconnectLinkedIn(){
+  if(!confirm('Disconnect LinkedIn?')) return;
+  const statusEl = $('linkedinStatus');
+  try{
+    const r = await fetch('/api/linkedin/disconnect',{method:'POST', headers: authHeaders()});
+    if(!r.ok){
+      window.notify && window.notify('Disconnect failed', true);
+      statusEl.textContent='Disconnect failed';
+      return;
+    }
+    window.notify && window.notify('Disconnected LinkedIn.');
+    statusEl.textContent='LinkedIn not connected';
+    $('btnLinkedInConnect').style.display='inline-block';
+    $('btnLinkedInDisconnect').style.display='none';
+  }catch(e){
+    window.notify && window.notify('Disconnect error: '+e.message, true);
+    console.error('[LinkedIn disconnect]', e);
+  }
+}
+async function loadLinkedInStatus(){
+  try{
+    const r=await fetch('/api/linkedin/status',{headers: authHeaders()});
+    const d=await r.json();
+    if(d.connected){
+      $('linkedinStatus').textContent='LinkedIn connected ('+(d.short_id||'user')+')';
+      $('btnLinkedInConnect').style.display='none';
+      $('btnLinkedInDisconnect').style.display='inline-block';
+    } else {
+      $('linkedinStatus').textContent='LinkedIn not connected';
+      $('btnLinkedInConnect').style.display='inline-block';
+      $('btnLinkedInDisconnect').style.display='none';
+    }
+  }catch(e){ /* silent */ }
+}
+
+/* Admin actions */
+async function adminRefresh(){
+  try{
+    const uid = $('adminUserId').value.trim();
+    const r = await fetch(`/api/admin/auto/state?user_id=${encodeURIComponent(uid)}`, { headers: adminHeaders() });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Refresh failed');
+    const st = d.state || {};
+    const html = `
+      <div class="draft-card">
+        <h4 style="margin:0 0 6px;">State</h4>
+        <div style="font-size:13px;">
+          <div>enabled: <code>${String(st.enabled)}</code></div>
+          <div>last_post_at: <code>${st.last_post_at || '(none)'}</code></div>
+          <div>next_run_at: <code>${st.next_run_at || '(none)'}</code></div>
+        </div>
+      </div>
+    `;
+    $('adminState').innerHTML = html;
+    // Sync countdown
+    if (st.next_run_at) setNextRunCountdown(st.next_run_at);
+  }catch(e){
+    window.notify && window.notify('Admin refresh: ' + e.message, true);
+  }
+}
+
+async function adminSetNext(){
+  const uid = $('adminUserId').value.trim();
+  const dt = $('adminNextRunAt').value; // yyyy-MM-ddTHH:mm (local)
+  if (!dt){ window.notify && window.notify('Pick a datetime', true); return; }
+  // Convert to ISO "YYYY-MM-DDTHH:MM:SS" (assume picked time is UTC)
+  const iso = dt.length === 16 ? dt + ':00' : dt;
+  try{
+    const r = await fetch('/api/admin/auto/next-run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+      body: JSON.stringify({ user_id: uid, next_run_at: iso })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Set failed');
+    window.notify && window.notify('next_run_at updated');
+    setNextRunCountdown(d.next_run_at || null);
+    adminRefresh();
+  }catch(e){
+    window.notify && window.notify('Admin set: ' + e.message, true);
+  }
+}
+async function adminBump(sec){
+  const uid = $('adminUserId').value.trim();
+  try{
+    const r = await fetch('/api/admin/auto/next-run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+      body: JSON.stringify({ user_id: uid, in_seconds: sec })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Adjust failed');
+    window.notify && window.notify(`next_run_at in +${sec}s`);
+    setNextRunCountdown(d.next_run_at || null);
+    adminRefresh();
+  }catch(e){
+    window.notify && window.notify('Admin adjust: ' + e.message, true);
+  }
+}
+
+// Wire admin events
+$('btnSaveAdminToken')?.addEventListener('click', adminLocalSaveToken);
+$('btnAdminRefresh')?.addEventListener('click', adminRefresh);
+$('btnAdminSetNext')?.addEventListener('click', adminSetNext);
+$('btnAdminPlus30s')?.addEventListener('click', ()=>adminBump(30));
+$('btnAdminPlus1m')?.addEventListener('click', ()=>adminBump(60));
+$('btnAdminPlus5m')?.addEventListener('click', ()=>adminBump(300));
+
+/* Tabs */
+function showTab(tabId){
+  ['generator','drafts','dmAssistant','profile','adminTab'].forEach(id=>{
+    const sec = $(id);
+    if(sec) sec.style.display = (id===tabId?'block':'none');
+  });
+  const btns = {
+    generator: $('tabPostsBtn'),
+    drafts: $('tabDraftsBtn'),
+    dmAssistant: $('tabDmBtn'),
+    profile: $('tabProfileBtn'),
+    adminTab: $('tabAdminBtn')
+  };
+  Object.keys(btns).forEach(k=>{
+    const b = btns[k];
+    if(!b) return;
+    if(k===tabId) b.classList.add('btn-primary');
+    else b.classList.remove('btn-primary');
+  });
+  // Gate enforcement when opening Profile
+  if (tabId === 'profile') {
+    updateProfileAccess();
+    if (!isLoggedIn()) { try { $('authEmail')?.focus(); } catch(e){} }
+  }
+}
+
+/* Profile: load/save + button wiring */
+async function loadProfile(){
+  try{
+    const r = await fetch('/api/me', { headers: authHeaders() });
+    if (!r.ok) return;
+    const d = await r.json();
+    if ($('display_name')) $('display_name').value = d.display_name || '';
+    if ($('about_me')) $('about_me').value = d.about_me || '';
+    if ($('key_points')) $('key_points').value = d.key_points || '';
+    if ($('notify_on_draft')) $('notify_on_draft').checked = !!d.notify_on_draft;
+  }catch(e){ /* silent */ }
+}
+
+async function saveProfile(){
+  const status = $('profileStatus');
+  const btn = $('btnSaveProfile'); // <-- added
+  if (status) status.textContent = 'Saving...';
+  if (btn) btn.disabled = true;    // <-- added
+  try{
+    const body = {
+      display_name: $('display_name')?.value || '',
+      about_me: $('about_me')?.value || '',
+      notify_on_draft: !!$('notify_on_draft')?.checked
+    };
+    const r = await fetch('/api/me', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Save failed');
+    if (status) status.textContent = 'Saved';
+    setTimeout(()=>{ if (status) status.textContent=''; }, 1500);
+    loadProfile();
+  }catch(e){
+    if (status) status.textContent = 'Save error: ' + e.message;
+    setTimeout(()=>{ if (status) status.textContent=''; }, 2000);
+  } finally {
+    if (btn) btn.disabled = false; // <-- added
+  }
+}
+
+// NEW: Auth handlers
+async function doRegister(){
+  const email = $('authEmail')?.value?.trim() || '';
+  const password = $('authPassword')?.value || '';
+  if (!email || !password) { $('authStatus').textContent = 'Enter email and password'; return; }
+  $('authStatus').textContent = 'Registering...';
+  try{
+    const r = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Register failed');
+    // Persist token locally for authHeaders()
+    try {
+      localStorage.setItem('authToken', d.token || '');
+      localStorage.setItem('authEmail', d.email || email);
+      if (d.user_id) localStorage.setItem('authUserId', d.user_id);
+    } catch{}
+    $('authStatus').textContent = 'Registered';
+    updateAuthUI();
+    loadProfile();
+    ensureAdminUser();
+    window.notify && window.notify('Registered + logged in');
+  }catch(e){
+    $('authStatus').textContent = 'Error: ' + e.message;
+  }
+}
+
+async function doLogin(){
+  const email = $('authEmail')?.value?.trim() || '';
+  const password = $('authPassword')?.value || '';
+  if (!email || !password) { $('authStatus').textContent = 'Enter email and password'; return; }
+  $('authStatus').textContent = 'Logging in...';
+  try{
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Login failed');
+    try {
+      localStorage.setItem('authToken', d.token || '');
+      localStorage.setItem('authEmail', d.email || email);
+      if (d.user_id) localStorage.setItem('authUserId', d.user_id);
+    } catch{}
+    $('authStatus').textContent = 'Logged in';
+    updateAuthUI();
+    loadProfile();
+    ensureAdminUser();
+    window.notify && window.notify('Logged in');
+  }catch(e){
+    $('authStatus').textContent = 'Error: ' + e.message;
+  }
+}
+
+async function doLogout(){
+  $('authStatus').textContent = 'Logging out...';
+  try{
+    await fetch('/api/auth/logout', { method:'POST', headers: authHeaders() });
+  }catch(_){}
+  // Clear local state
+  try{
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('authEmail');
+    localStorage.removeItem('authUserId');
+  }catch{}
+  $('authStatus').textContent = 'Not logged in';
+  updateAuthUI();
+  showTab('profile');
+  window.notify && window.notify('Logged out');
+}
+
+// Wire auth buttons
+$('btnRegister')?.addEventListener('click', doRegister);
+$('btnLogin')?.addEventListener('click', doLogin);
+$('btnLogout')?.addEventListener('click', doLogout);
+$('btnSaveProfile')?.addEventListener('click', saveProfile); // Wire Save Profile
+// Wire Save Key Points
+$('btnSaveKeyPoints')?.addEventListener('click', saveKeyPoints);
+
+/* Init */
+updateAuthUI();
+loadTemplates();
+loadProfile();
+loadDrafts();
+loadLinkedInStatus();
+loadAutoSettings();
+loadAutoStatus();
+showTab('generator');
+if (typeof dmRenderHistory === 'function') dmRenderHistory();  // safe call (was direct call causing ReferenceError)
+updateProfileAccess();
+updateAdminVisibility();
+ensureAdminUser();
+
+// Keep Admin tab gating in sync on auth changes
+try{
+  document.getElementById('btnLogin')?.addEventListener('click', ()=> setTimeout(()=>{ ensureAdminUser(); updateAdminVisibility(); }, 300));
+  document.getElementById('btnLogout')?.addEventListener('click', ()=> setTimeout(()=>{ updateAdminVisibility(); }, 300));
+}catch{}
+
+/* Fallback: define updateCountdowns if missing (prevents runtime error) */
+if (typeof updateCountdowns !== 'function') {
+  function updateCountdowns() {
+    document.querySelectorAll('.draft-card').forEach(card => {
+      const id = card.getAttribute('data-id');
+      const publishAttr = card.getAttribute('data-publish');
+      if (!publishAttr) return;
+      const publish = new Date(publishAttr).getTime();
+      const diff = publish - Date.now();
+      const el = document.getElementById('cd-' + id);
+      if (!el) return;
+      if (isNaN(publish)) {
+        el.textContent = 'Unknown schedule';
+        return;
+      }
+      if (diff <= 0) {
+        el.textContent = 'Publishing soon...';
+      } else {
+        const m = Math.floor(diff / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        el.textContent = `Auto-post in ${m}m ${s}s`;
+      }
+    });
+  }
+}
+
+// NEW: Fallback stub so missing DM module doesn't break later code (theme toggle etc.)
+if (typeof window.dmRenderHistory !== 'function') {
+  window.dmRenderHistory = function(){ /* no-op fallback */ };
+}
+
+// Theme persistence + toggling (kept)
+const THEME_KEY = 'theme';
+function applyTheme(theme){
+  const isDark = theme === 'dark';
+  document.body.classList.toggle('dark-mode', isDark);
+  const btn = $('themeToggle');
+  if (btn) {
+    btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    btn.dataset.mode = isDark ? 'dark' : 'light';
+  }
+  try { localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light'); } catch {}
+}
+function initTheme(){
+  let saved = '';
+  try { saved = localStorage.getItem(THEME_KEY) || ''; } catch {}
+  const preferred = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  applyTheme(preferred);
+}
+function toggleTheme(){
+  const next = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+  applyTheme(next);
+}
+initTheme();
+$('themeToggle') && $('themeToggle').addEventListener('click', toggleTheme);
+$('themeToggle') && $('themeToggle').addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleTheme(); } });
+</script>
+</body>
+</html>

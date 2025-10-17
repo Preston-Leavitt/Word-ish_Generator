@@ -1808,18 +1808,9 @@ def _parse_hhmm(s: Optional[str]) -> Optional[int]:
 def _effective_posts_per_day(user_id: str) -> int:
     """
 
-    Determine user-specific posts/day: user setting if present else env default.
-    Cap at 5, min 1.
+    Force 1 post/day regardless of per-user/env settings.
     """
-    per_user = None
-    rec = USER_BY_ID.get(user_id) or {}
-    if rec.get("auto_posts_per_day"):
-        try:
-            per_user = int(rec["auto_posts_per_day"])
-        except Exception:
-            per_user = None
-    base = per_user if per_user else DAILY_AUTO_LIMIT
-    return max(1, min(5, int(base)))
+    return 1
 
 def _get_window_minutes(user_id: str) -> Tuple[int, int]:  # was: tuple[int, int]
     """
@@ -1836,76 +1827,72 @@ def _get_window_minutes(user_id: str) -> Tuple[int, int]:  # was: tuple[int, int
         return 0, 1440
     return s, e
 
-def _next_slot_within_window(now: datetime.datetime, start_min: int, end_min: int, per_day: int) -> datetime.datetime:
+def _next_slot_within_window(now: datetime.datetime, s_min: int, e_min: int, per_day: int) -> datetime.datetime:
     """
-    Compute the next run datetime from 'now' using 'per_day' evenly spaced slots within [start_min, end_min).
-    Supports overnight windows by mapping into a 0..(1440 or window_len) space.
+    Compute the next datetime slot within a daily window (minutes since midnight).
+    Supports overnight windows where e_min <= s_min and evenly spaces 'per_day' slots.
+    Returns the next slot as a naive UTC datetime (consistent with other scheduling code).
     """
-    # Build day references
-    tz_now = now  # naive UTC usage in app
-    today = tz_now.date()
+    per_day = max(1, int(per_day or 1))
 
-    # Normalize window
-    if end_min <= start_min:
-        # overnight: extend end by 1440 for length calc
-        window_len = (end_min + 1440) - start_min
+    # Compute window length in minutes, handling overnight wrap
+    if e_min <= s_min:
+        window_len = (e_min + 1440) - s_min
     else:
-        window_len = end_min - start_min
-    window_len = max(1, window_len)
+        window_len = e_min - s_min
 
-    # Interval and jitter
-    interval = max(1, window_len // max(1, per_day))
-    jitter = min(10, max(1, interval // 10))
+    # Interval between slots (integer minutes)
+    interval = max(1, int(round(window_len / per_day)))
 
-    # Minutes since "window start today"
-    mins_since_midnight = tz_now.hour*60 + tz_now.minute
-    # Map current time into window timeline for today
-    if end_min <= start_min:
-        # overnight: treat times < end_min as after midnight (+1440)
-        cur_pos = (mins_since_midnight - start_min) if mins_since_midnight >= start_min else (mins_since_midnight + 1440 - start_min)
-    else:
-        cur_pos = mins_since_midnight - start_min
+    # Start of today's window as datetime
+    today = now.date()
+    start_dt = datetime.datetime.combine(
+        today, datetime.time(hour=(s_min // 60), minute=(s_min % 60))
+    )
 
-    # Build today's slot positions
-    slots = [i*interval for i in range(per_day)]
-    # Guarantee the last slot doesn't exceed window; clip if needed
-    slots = [min(p, window_len-1) for p in slots]
+    # Build candidate slots for today
+    slots = [start_dt + datetime.timedelta(minutes=i * interval) for i in range(per_day)]
 
-    # Find next slot >= cur_pos
-    next_pos = None
-    for p in slots:
-        if p >= cur_pos:
-            next_pos = p
-            break
+    # If window wraps past midnight, some slots may fall into next calendar day already;
+    # the candidate generation above still produces correct datetimes.
+    for slot in slots:
+        if slot > now:
+            return slot
 
-    if next_pos is None:
-        # tomorrow at first slot
-        base_day = today + datetime.timedelta(days=1)
-        # compute minutes offset for the first slot
-        first_slot = slots[0] if slots else 0
-        # reconstruct absolute minutes since midnight for base_day considering overnight
-        start_abs = start_min % 1440
-        slot_abs = (start_abs + first_slot) % 1440
-        dt = datetime.datetime.combine(base_day, datetime.time(hour=slot_abs//60, minute=slot_abs%60))
-    else:
-        # today slot at start_min + next_pos (wrap within 24h)
-        base_day = today
-        # cur slot absolute minutes since midnight considering overnight
-        target_abs = (start_min + next_pos) % 1440
-        dt = datetime.datetime.combine(base_day, datetime.time(hour=target_abs//60, minute=target_abs%60))
-        # If overnight and target already passed (edge), roll to tomorrow
-        if dt <= tz_now:
-            dt = dt + datetime.timedelta(days=1)
+    # No slot left today -> return first slot tomorrow
+    return slots[0] + datetime.timedelta(days=1)
 
-    # Apply small positive jitter
-    dt = dt + datetime.timedelta(minutes=random.randint(0, jitter))
-    return dt
+# NEW: preferred-time minutes helper (fallback to 09:00 if unset/invalid)
+def _get_preferred_minutes(user_id: str) -> int:
+    rec = USER_BY_ID.get(user_id) or {}
+    m = _parse_hhmm(rec.get("auto_window_start"))
+    return m if m is not None else 9 * 60
 
 def _schedule_next_for_user(user_id: str, base_time: Optional[datetime.datetime] = None) -> datetime.datetime:
     """
-    Compute and schedule the next_run_at for a user using their per-day and window settings.
-    Returns the scheduled datetime.
+    Compute and schedule the next_run_at for a user.
+    Daily cadence schedules at preferred time (auto_window_start) ±30 minutes.
     """
+    now = base_time or datetime.datetime.utcnow()
+    per_day = _effective_posts_per_day(user_id)
+
+    # Daily preferred-time scheduler (±30m jitter)
+    if per_day == 1:
+        pref_min = _get_preferred_minutes(user_id)
+        jitter = random.randint(-30, 30)
+        today = now.date()
+        dt = datetime.datetime.combine(
+            today,
+            datetime.time(hour=pref_min // 60, minute=pref_min % 60)
+        ) + datetime.timedelta(minutes=jitter) - datetime.timedelta(minutes=60)
+        if dt <= now:
+            dt = dt + datetime.timedelta(days=1)
+        st = AUTO_STATE.setdefault(user_id, {"enabled": False, "last_post_at": None, "next_run_at": None})
+        st["next_run_at"] = dt.isoformat()
+        _schedule_auto_gen_at(user_id, dt)
+        _persist_auto_state()
+        return dt
+
     now = base_time or datetime.datetime.utcnow()
     per_day = _effective_posts_per_day(user_id)
     s_min, e_min = _get_window_minutes(user_id)
@@ -2228,12 +2215,15 @@ async def auto_generate_status(request: Request):
     user_id = _validate_user(request)
     st = AUTO_STATE.get(user_id) or {}
     enabled = bool(st.get("enabled", USER_BY_ID.get(user_id, {}).get("auto_generate_enabled", AUTO_PREFS.get(user_id, False))))
-    # NOTE: Do not mutate next_run_at here; status should be read-only.
+    # Daily cadence -> report full-day interval
     try:
         per_day = _effective_posts_per_day(user_id)
-        s_min, e_min = _get_window_minutes(user_id)
-        window_len = (e_min + (1440 if e_min <= s_min else 0)) - s_min
-        interval_minutes = max(1, int(round(window_len / max(1, per_day))))
+        if per_day == 1:
+            interval_minutes = 1440
+        else:
+            s_min, e_min = _get_window_minutes(user_id)
+            window_len = (e_min + (1440 if e_min <= s_min else 0)) - s_min
+            interval_minutes = max(1, int(round(window_len / max(1, per_day))))
     except Exception:
         interval_minutes = 1440
     rec = USER_BY_ID.get(user_id) or {}
@@ -2254,9 +2244,12 @@ async def auto_generate_status_post(request: Request, body: Dict = Body(default=
     enabled = bool(st.get("enabled", USER_BY_ID.get(user_id, {}).get("auto_generate_enabled", AUTO_PREFS.get(user_id, False))))
     try:
         per_day = _effective_posts_per_day(user_id)
-        s_min, e_min = _get_window_minutes(user_id)
-        window_len = (e_min + (1440 if e_min <= s_min else 0)) - s_min
-        interval_minutes = max(1, int(round(window_len / max(1, per_day))))
+        if per_day == 1:
+            interval_minutes = 1440
+        else:
+            s_min, e_min = _get_window_minutes(user_id)
+            window_len = (e_min + (1440 if e_min <= s_min else 0)) - s_min
+            interval_minutes = max(1, int(round(window_len / max(1, per_day))))
     except Exception:
         interval_minutes = 1440
     rec = USER_BY_ID.get(user_id) or {}

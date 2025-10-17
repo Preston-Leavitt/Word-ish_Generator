@@ -518,20 +518,26 @@
 
     <!-- Auto settings -->
     <div class="row" style="margin-top:10px;">
+      <!-- Commented out: Posts per day (forced to 1) -->
+      <!--
       <div>
         <label for="autoPerDay">Posts per day (max 5)</label>
         <select id="autoPerDay">
           <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
         </select>
       </div>
+      -->
       <div>
-        <label for="autoWinStart">Preferred window start</label>
+        <label for="autoWinStart">Preferred window</label>
         <input id="autoWinStart" type="time" value="09:00">
       </div>
+      <!-- Commented out: Preferred window end (unused) -->
+      <!--
       <div>
         <label for="autoWinEnd">Preferred window end</label>
         <input id="autoWinEnd" type="time" value="17:00">
       </div>
+      -->
     </div>
     <div class="flex" style="margin-top:8px;">
       <button id="btnSaveAuto" style="padding:8px 12px;font-size:13px;">Save Auto Settings</button>
@@ -609,14 +615,15 @@
           <label for="display_name">Display Name</label>
           <input id="display_name" type="text" placeholder="Your name as shown in app">
         </div>
+        <!--
         <div>
-          <!-- replaced email read-only with notifications toggle -->
           <label for="notify_on_draft">Notifications</label>
           <div style="display:flex;align-items:center;gap:8px;">
             <input id="notify_on_draft" type="checkbox">
             <span>Email me when a draft is created</span>
           </div>
         </div>
+      -->
       </div>
       <label for="about_me">About Me</label>
       <textarea id="about_me" placeholder="Short bio, background, what you care about"></textarea>
@@ -882,16 +889,13 @@ async function loadAutoSettings(){
     const r = await fetch('/api/me', { headers: authHeaders() });
     if(!r.ok) return;
     const d = await r.json();
-    if ($('autoPerDay')) $('autoPerDay').value = String(d.auto_posts_per_day || 1);
+    // Only reflect preferred start time
     if ($('autoWinStart') && d.auto_window_start) $('autoWinStart').value = d.auto_window_start;
-    if ($('autoWinEnd') && d.auto_window_end) $('autoWinEnd').value = d.auto_window_end;
   }catch(e){ /* silent */ }
 }
 
 async function saveAutoSettings(){
-  const perDay = parseInt(($('autoPerDay')?.value || '1'), 10);
   const start = $('autoWinStart')?.value || '';
-  const end = $('autoWinEnd')?.value || '';
   const status = $('autoSettingsStatus');
   if (status) status.textContent = 'Saving...';
   try{
@@ -899,15 +903,13 @@ async function saveAutoSettings(){
       method:'POST',
       headers:{'Content-Type':'application/json', ...authHeaders()},
       body: JSON.stringify({
-        auto_posts_per_day: Math.max(1, Math.min(5, perDay|0)),
-        auto_window_start: start || null,
-        auto_window_end: end || null
+        // Backend enforces 1/day; only persist preferred time
+        auto_window_start: start || null
       })
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || 'Save failed');
     if (status) status.textContent = 'Saved';
-    // update countdown if server recomputed next_run
     loadAutoStatus();
   }catch(e){
     if (status) status.textContent = 'Save error: ' + e.message;
@@ -950,10 +952,8 @@ async function loadAutoStatus(){
     const d = await r.json();
     if ($('autoToggle')) $('autoToggle').checked = !!d.enabled;
     setNextRunCountdown(d.next_run_at || null);
-    // Optionally use d.posts_per_day, d.window_start/_end to prefill if empty
-    if ($('autoPerDay') && !$('autoPerDay').value) $('autoPerDay').value = String(d.posts_per_day || 1);
+    // Only mirror preferred start time
     if ($('autoWinStart') && d.window_start) $('autoWinStart').value = d.window_start;
-    if ($('autoWinEnd') && d.window_end) $('autoWinEnd').value = d.window_end;
   }catch(e){
     // silent
   }

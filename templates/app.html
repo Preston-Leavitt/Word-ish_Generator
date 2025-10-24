@@ -1,28 +1,174 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Word Maker</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
-</head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Word‑ish Generator</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    </head>
 <body>
-    <div class="container">
-        <h2>Word Maker</h2>
-        <form action="/predict" method="post">
-            <p>Input Starting Letter(optional)</p>
-            <input type="text" id="sLetter" name="sLetter" maxlength="1" pattern="[a-zA-Z]"><br><br>
-            <p>Input Length(optional)</p>
-            <input type="number" id="length" name="length" min="0"><br><br>
+    <div class="page">
+            <header class="header">
+                <h1 class="app-title">✨ Word‑ish Generator</h1>
+                <p class="app-tagline">Mash up a brand‑new word, its playful definition, and a vibe‑matched image + track.</p>
+            </header>
 
-            <input type="submit" value="Word">
-        </form>
-        <h3>Word(Or not?): {{ word }}</h3>
-        <h2>Definition: {{definition}}</h2>
-        <h3>Song Name: {{ song_url }}</h3>
+        <main class="content">
+            <section class="card form-card">
+                <form action="/predict" method="post" class="form-grid" id="wordForm">
+                    <div class="field field--sletter">
+                        <label for="sLetter">Start letter (optional)</label>
+                        <input type="text" id="sLetter" name="sLetter" maxlength="1" pattern="[a-zA-Z]" placeholder="e.g., A" />
+                    </div>
+                    <div class="field field--length">
+                        <label for="length">Length (optional)</label>
+                        <input type="number" id="length" name="length" min="0" placeholder="2–10" />
+                    </div>
+                    <div class="field field--yourword is-hidden" id="secretWordField">
+                        <label for="yourWord">Add your own word (optional)</label>
+                        <input type="text" id="yourWord" name="yourWord" autocomplete="off" placeholder="Type your word (e.g., peroneor) — overrides letter/length" />
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-primary" type="submit">✨ Generate</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="results">
+                {% if word %}
+                    <article class="card result-card">
+                                                                                                            <div class="result-header">
+                                                                                                                    <h2 class="word gradient-text">{{ word }}</h2>
+                                                                                                                    {% if status_label %}
+                                                                                                                        <span class="badge">{{ status_label }}</span>
+                                                                                                                    {% endif %}
+                        </div>
+                        <p class="definition">{{ definition }}</p>
+
+                        <div class="media">
+                            {% if pic_url %}
+                                                <figure class="image-wrap">
+                                                    <img src="{{ pic_url }}" alt="Generated image for {{ word }}" />
+                                                    <figcaption class="image-caption">{{ pic_url.split('/')[-1] }}</figcaption>
+                                                </figure>
+                            {% endif %}
+
+                                            {% if song_url %}
+                                                {% set song_name = song_url.split('/')[-1] %}
+                                                {% set ext = song_url.split('.')[-1]|lower %}
+                                                {% set mime = 'audio/ogg' if ext == 'ogg' else ('audio/mpeg' if ext in ['mp3','mpeg'] else ('audio/wav' if ext == 'wav' else 'audio/mpeg')) %}
+                                                <div class="audio-wrap">
+                                                    <div class="audio-meta">
+                                                        <span class="label">Track:</span>
+                                                        <span class="value">{{ song_name }}</span>
+                                                    </div>
+                                                    <audio id="track" autoplay loop preload="auto" playsinline>
+                                                        <source src="{{ song_url }}" type="{{ mime }}" />
+                                                        Your browser does not support the audio element.
+                                                    </audio>
+                                                </div>
+                                            {% endif %}
+                        </div>
+                    </article>
+                {% else %}
+                                <article class="card empty-card">
+                                    <p>Type your own word or pick a starting letter and/or length, then hit <strong>✨ Generate</strong> to conjure a definition and vibe.</p>
+                    </article>
+                {% endif %}
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Made for fun. Images and songs are creatively curated by AI.</p>
+        </footer>
     </div>
-    <img src="{{ pic_url }}" alt="{{ pic_url }} " style ="margin: auto; display: block;">
+    <!-- Loading overlay shown during generation -->
+    <div id="loading" class="loading-overlay" hidden aria-hidden="true" aria-live="polite" aria-busy="true">
+        <div class="loading">
+            <div class="spinner" aria-hidden="true"></div>
+            <div class="loading-text">Summoning your word…</div>
+        </div>
+    </div>
+    <!-- Tiny toast for feedback -->
+    <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+            <script>
+            // Nudge browsers that block autoplay; try to start playback after load
+            window.addEventListener('DOMContentLoaded', () => {
+                const a = document.getElementById('track');
+                if (a && a.paused) {
+                    a.play?.().catch(() => {/* silently ignore if user gesture required */});
+                }
+
+                    // Tiny confetti burst when a new word appears
+                            const hasWord = !!document.querySelector('.word');
+                            if (hasWord) {
+                        const colors = ['#6cf1ff','#8a7dff','#ff80bf','#ffd166','#95f985'];
+                        const count = 36;
+                        for (let i=0; i<count; i++) {
+                            const piece = document.createElement('i');
+                            piece.className = 'confetti';
+                            piece.style.left = (10 + Math.random()*80) + 'vw';
+                            piece.style.background = colors[Math.floor(Math.random()*colors.length)];
+                            piece.style.transform = `rotate(${Math.random()*360}deg)`;
+                            piece.style.animationDelay = (Math.random()*0.4) + 's';
+                            document.body.appendChild(piece);
+                            setTimeout(() => piece.remove(), 1800);
+                        }
+                    }
+
+                // Show loading overlay on form submit and disable controls
+                const form = document.querySelector('.form-card form');
+                if (form) {
+                    form.addEventListener('submit', () => {
+                        const overlay = document.getElementById('loading');
+                        overlay?.removeAttribute('hidden');
+                        overlay?.setAttribute('aria-hidden', 'false');
+                        document.body.classList.add('is-busy');
+                        // Only adjust the button; do not disable inputs so values submit
+                        const btn = form.querySelector('button[type="submit"]');
+                        if (btn) {
+                            btn.disabled = true;
+                            btn.classList.add('is-loading');
+                            btn.textContent = '✨ Generating…';
+                        }
+                    }, { once: true });
+                }
+
+                // Reveal the secret custom-word field via keyboard
+                const toggleSecret = () => {
+                    const fld = document.getElementById('secretWordField');
+                    const frm = document.getElementById('wordForm');
+                    if (!fld || !frm) return;
+                    const hidden = fld.classList.toggle('is-hidden');
+                    frm.classList.toggle('custom-visible');
+                    const t = document.getElementById('toast');
+                    if (t) {
+                        const msg = hidden ? 'Custom word hidden' : 'Custom word unlocked';
+                        t.textContent = msg + ' (Ctrl+Space or Ctrl+Alt+S to toggle)';
+                        t.removeAttribute('hidden');
+                        setTimeout(() => t.setAttribute('hidden',''), 1500);
+                    }
+                    if (!hidden) {
+                        const input = fld.querySelector('input#yourWord');
+                        input?.focus();
+                    }
+                };
+                document.addEventListener('keydown', (e) => {
+                    // Primary combo: Ctrl+Space (note: on some systems OS may intercept)
+                    const ctrlSpace = e.ctrlKey && (e.code === 'Space' || e.key === ' ');
+                    // Alternative combo (more reliable on Windows): Ctrl+Alt+S
+                    const ctrlAltS = e.ctrlKey && e.altKey && (e.code === 'KeyS' || (e.key && e.key.toLowerCase() === 's'));
+                    // macOS alternative: Cmd+Space (if not taken by Spotlight)
+                    const cmdSpace = e.metaKey && (e.code === 'Space' || e.key === ' ');
+                    if (ctrlSpace || ctrlAltS || cmdSpace) {
+                        toggleSecret();
+                        e.preventDefault();
+                    }
+                });
+            });
+        </script>
 </body>
-<audio autoplay loop>
-  <source src="{{ song_url }}" type="audio/mpeg">
-</audio>
 </html>

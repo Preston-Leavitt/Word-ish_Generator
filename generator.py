@@ -405,20 +405,21 @@ def generate_definition_ai(word: str) -> str:
 
     system = (
         "If the target word is an established entry in major dictionaries, return its standard dictionary definition instead of inventing one."
-        "You are a playful lexicographer and mischievous wordsmith tasked with inventing crisp, surprising, and plausible definitions for new words. "
-        "Favor vivid concrete images, compact wit, and unusual metaphors; avoid vague phrasings such as \"state of\", \"feeling of\", or \"thing that\". "
-        "Keep tone bright and friendly, suitable for all audiences, and aim for a humorous twist when it fits. "
+        "You are a lexicographer and wordsmith tasked with inventing plausible definitions for new words. "
+        "Avoid vague phrasings such as \"state of\", \"feeling of\", or \"thing that\". "
+        "Make it realistic. "
         "Give a good mix of verbs, nouns, and adjectives, adverbs, and other parts of speech."
     )
     user = (
-        f"Invent a distinctive dictionary-style definition for the fake word \"{word}\". "
+        "If the target word is an established entry in major dictionaries, return its standard dictionary definition instead of inventing one."
+        f"Invent a dictionary-style plausible definition for the fake word \"{word}\". "
         "Produce 1–2 sentences and keep the whole entry under ~40 words. "
         "Append the part of speech in parentheses immediately after the word (for example (noun) or (verb)). "
         "Optionally add a tiny example after \"e.g.,\" only if it sharpens the image. "
         "Do not mention or admit the word is invented; present the entry as a natural dictionary line."
-        "If the target word is an established entry in major dictionaries, return its standard dictionary definition instead of inventing one."
+        
     )
-    banned_terms = ["sock", "socks", "shoe", "shoes", "hosiery", "laundry", "drawer", "drawers"]
+    banned_terms = ["sock", "socks", "shoe", "shoes", "hosiery", "laundry", "drawer", "drawers","dance","squirrel","whimsical"]
     def _uses_banned(text: str) -> bool:
         t = (text or "").lower()
         return any(term in t for term in banned_terms)
@@ -472,9 +473,9 @@ def _sample_items(items: list[str], ratio: float | None = None) -> list[str]:
         return items
     if ratio is None:
         try:
-            ratio = float(os.getenv("MEDIA_SAMPLE_RATIO", "0.5") or 0.5)
+            ratio = float(os.getenv("MEDIA_SAMPLE_RATIO", "1") or 0.5)
         except Exception:
-            ratio = 0.5
+            ratio = 1
     # Clamp ratio to [0, 1]
     ratio = max(0.0, min(1.0, ratio))
     k = int(round(len(items) * ratio))
@@ -491,7 +492,7 @@ def choose_media_ai(word: str, definition: str, images: list[str], songs: list[s
     Falls back to random choices if API key is missing or on error.
     """
     api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    if not api_key or 1 == 1:
         # Fallback to random if no key
         return (random.choice(images) if images else None, random.choice(songs) if songs else None)
 
@@ -728,9 +729,9 @@ def guess():
         if was_new:
             # Show created date if we have it; else generic note
             date_part = created_at_cached.split('T')[0] if 'T' in created_at_cached else (created_at_cached or None)
-            status_label = f"🕒 Created on {date_part}" if date_part else "🕒 Created earlier"
+            status_label = f" Created on {date_part}" if date_part else " Created earlier"
         else:
-            status_label = "📚 Pre-existing word"
+            status_label = " Pre-existing word"
         is_new_word = False
         chosen_image = cached.get("image")
         chosen_song = cached.get("song")
@@ -751,7 +752,7 @@ def guess():
         # Persist a created_at we can also show on the page
         created_now = datetime.utcnow().isoformat(timespec='seconds') + 'Z'
         _append_defs_cache(reconstructed, definition, is_new_word, chosen_image, chosen_song, source=source_label, created_at=created_now)
-        status_label = "✨ Freshly minted" if is_new_word else "📚 Pre-existing word"
+        status_label = " Freshly minted" if is_new_word else " Pre-existing word"
         try:
             print(f"Cache MISS for '{reconstructed}': generated and cached definition + media")
         except Exception:

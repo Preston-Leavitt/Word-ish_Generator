@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login - Word-ish</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 class="app-title"><a href="{{ url_for('index') }}" class="logo-link">Word-ish</a></h1>
+                </div>
+                <nav class="nav-menu">
+                    <a href="{{ url_for('index') }}" class="nav-link">Back to Home</a>
+                </nav>
+            </div>
+        </header>
+
+        <main class="content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="auth-container">
+                <div class="card auth-card">
+                    <h2 class="auth-title">Login</h2>
+                    <form action="{{ url_for('login') }}" method="post" class="auth-form">
+                        <div class="field">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" name="username" required autofocus>
+                        </div>
+                        <div class="field">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Login</button>
+                    </form>
+                    <div class="auth-footer">
+                        <p>Don't have an account? <a href="{{ url_for('register') }}">Sign up</a></p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2026 Word-ish Generator</p>
+        </footer>
+    </div>
+</body>
+</html>

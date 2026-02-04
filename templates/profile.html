@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Profile - Word-ish Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 class="app-title">Word-ish</h1>
+                    <p class="app-tagline">Create and discover unique word definitions</p>
+                </div>
+                <nav class="nav-menu">
+                    <a href="{{ url_for('index') }}" class="nav-link">Generate</a>
+                    <a href="{{ url_for('leaderboard') }}" class="nav-link">Leaderboard</a>
+                    <a href="{{ url_for('daily') }}" class="nav-link">Today's Words</a>
+                    <a href="{{ url_for('lookup') }}" class="nav-link">Search</a>
+                    <a href="{{ url_for('surprise') }}" class="nav-link">Surprise Me</a>
+                    {% if current_user.is_authenticated %}
+                        <span class="nav-user">Hi, {{ current_user.username }}</span>
+                        <a href="{{ url_for('profile') }}" class="nav-link active">Profile</a>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="nav-link">Login</a>
+                        <a href="{{ url_for('register') }}" class="nav-link nav-link-primary">Sign Up</a>
+                    {% endif %}
+                </nav>
+            </div>
+        </header>
+
+        <main class="content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="profile-container">
+                <section class="card profile-settings">
+                    <h2 class="section-title">Account Settings</h2>
+                    
+                    <div class="setting-section">
+                        <h3>Change Username</h3>
+                        <form method="POST" class="settings-form">
+                            <input type="hidden" name="action" value="change_username">
+                            <div class="field">
+                                <label for="new_username">New Username</label>
+                                <input type="text" id="new_username" name="new_username" required minlength="3">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Username</button>
+                        </form>
+                    </div>
+
+                    <div class="setting-section">
+                        <h3>Change Password</h3>
+                        <form method="POST" class="settings-form">
+                            <input type="hidden" name="action" value="change_password">
+                            <div class="field">
+                                <label for="current_password">Current Password</label>
+                                <input type="password" id="current_password" name="current_password" required>
+                            </div>
+                            <div class="field">
+                                <label for="new_password">New Password</label>
+                                <input type="password" id="new_password" name="new_password" required minlength="6">
+                            </div>
+                            <div class="field">
+                                <label for="confirm_password">Confirm New Password</label>
+                                <input type="password" id="confirm_password" name="confirm_password" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Password</button>
+                        </form>
+                    </div>
+
+                    <div class="setting-section">
+                        <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+                    </div>
+                </section>
+
+                <section class="card my-words">
+                    <h2 class="section-title">My Words</h2>
+                    {% if my_words %}
+                        <div class="words-grid">
+                            {% for word in my_words %}
+                                <article class="word-card">
+                                    <div class="word-card-header">
+                                        <a href="{{ url_for('word_detail', word_text=word['word']) }}" class="word-link">
+                                            <h3 class="word">{{ word['word'] }}</h3>
+                                        </a>
+                                        <span class="word-score">{{ word['score'] }} votes</span>
+                                    </div>
+                                    <p class="word-definition">{{ word['definition'][:150] }}{% if word['definition']|length > 150 %}...{% endif %}</p>
+                                    <div class="word-meta">
+                                        <span class="word-date">{{ word['created_at'][:10] }}</span>
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="no-words">You haven't created any words yet. <a href="{{ url_for('index') }}">Generate your first word!</a></p>
+                    {% endif %}
+                </section>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2026 Word-ish Generator. Definitions and media curated with AI.</p>
+        </footer>
+    </div>
+</body>
+</html>

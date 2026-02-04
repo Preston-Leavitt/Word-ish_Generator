@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ word }} - Word-ish</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 class="app-title"><a href="{{ url_for('index') }}" class="logo-link">Word-ish</a></h1>
+                </div>
+                <nav class="nav-menu">
+                    <a href="{{ url_for('index') }}" class="nav-link">Generate</a>
+                    <a href="{{ url_for('leaderboard') }}" class="nav-link">Leaderboard</a>
+                    <a href="{{ url_for('daily') }}" class="nav-link">Today's Words</a>
+                    <a href="{{ url_for('lookup') }}" class="nav-link">Search</a>
+                    <a href="{{ url_for('surprise') }}" class="nav-link">Surprise Me</a>
+                    {% if current_user.is_authenticated %}
+                        <span class="nav-user">Hi, {{ current_user.username }}</span>
+                        <a href="{{ url_for('profile') }}" class="nav-link">Profile</a>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="nav-link">Login</a>
+                        <a href="{{ url_for('register') }}" class="nav-link nav-link-primary">Sign Up</a>
+                    {% endif %}
+                </nav>
+            </div>
+        </header>
+
+        <main class="content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="result-header-section">
+                <div class="result-meta">
+                    <div>
+                        <h2 class="word">{{ word }}</h2>
+                        {% if status_label %}
+                            <span class="badge">{{ status_label }}</span>
+                        {% endif %}
+                    </div>
+                    {% if word_id and current_user.is_authenticated %}
+                    <div class="vote-controls">
+                        <button class="vote-btn vote-up {% if user_vote == 1 %}active{% endif %}" 
+                                onclick="vote({{ word_id }}, 1)" 
+                                data-word-id="{{ word_id }}">
+                            <span class="vote-icon">▲</span>
+                        </button>
+                        <span class="vote-score" id="score-{{ word_id }}">{{ score }}</span>
+                        <button class="vote-btn vote-down {% if user_vote == -1 %}active{% endif %}" 
+                                onclick="vote({{ word_id }}, -1)" 
+                                data-word-id="{{ word_id }}">
+                            <span class="vote-icon">▼</span>
+                        </button>
+                    </div>
+                    {% elif word_id %}
+                    <div class="vote-display">
+                        <span class="vote-score">{{ score }} votes</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <article class="card result-card {% if pic_url %}has-background{% endif %}" {% if pic_url %}style="background-image: url('{{ pic_url }}');"{% endif %}>
+                <p class="definition">{{ definition }}</p>
+                {% if song_url %}
+                        {% set song_name = song_url.split('/')[-1].rsplit('.', 1)[0].replace('_', ' ').replace('-', ' ').title() %}
+                        {% set ext = song_url.split('.')[-1]|lower %}
+                        {% set mime = 'audio/ogg' if ext == 'ogg' else ('audio/mpeg' if ext in ['mp3','mpeg'] else ('audio/wav' if ext == 'wav' else 'audio/mpeg')) %}
+                        <div class="audio-corner">
+                            <audio id="track" autoplay loop preload="auto">
+                                <source src="{{ song_url }}" type="{{ mime }}" />
+                            </audio>
+                            <div class="audio-corner-header">
+                                <span class="song-name">{{ song_name }}</span>
+                            </div>
+                            <div class="wax-seal-compact" id="waxSeal">
+                                <div class="seal-ring"></div>
+                                <div class="seal-marker"></div>
+                                <div class="seal-center">
+                                    <div class="seal-letter">W</div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+            </article>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2026 Word-ish Generator</p>
+        </footer>
+    </div>
+
+    <script>
+        function vote(wordId, voteType) {
+            const currentVote = document.querySelector(`.vote-btn[data-word-id="${wordId}"].active`);
+            const isCurrentVote = currentVote && 
+                ((voteType === 1 && currentVote.classList.contains('vote-up')) ||
+                 (voteType === -1 && currentVote.classList.contains('vote-down')));
+            
+            const actualVote = isCurrentVote ? 0 : voteType;
+            
+            fetch('/vote', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    word_id: wordId,
+                    vote_type: actualVote
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('score-' + wordId).textContent = data.score;
+                    
+                    document.querySelectorAll(`.vote-btn[data-word-id="${wordId}"]`).forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    
+                    if (data.vote !== 0) {
+                        const activeBtn = document.querySelector(
+                            `.vote-btn.vote-${data.vote === 1 ? 'up' : 'down'}[data-word-id="${wordId}"]`
+                        );
+                        if (activeBtn) activeBtn.classList.add('active');
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        // Spinning Wax Seal Volume Control
+        document.addEventListener('DOMContentLoaded', () => {
+            const audio = document.getElementById('track');
+            const waxSeal = document.getElementById('waxSeal');
+            
+            if (audio && waxSeal) {
+                let isDragging = false;
+                let currentAngle = 252;
+                let targetAngle = 252;
+                let momentum = 0;
+                let lastMouseAngle = 0;
+                
+                audio.volume = 0.7;
+                
+                function angleToVolume(angle) {
+                    let normalized = angle % 360;
+                    if (normalized < 0) normalized += 360;
+                    return (normalized / 360) * 100;
+                }
+                
+                function updateSeal() {
+                    if (!isDragging) {
+                        momentum *= 0.94;
+                        currentAngle += momentum;
+                    }
+                    
+                    waxSeal.style.transform = `rotate(${currentAngle}deg)`;
+                    const volume = angleToVolume(currentAngle);
+                    audio.volume = volume / 100;
+                    
+                    requestAnimationFrame(updateSeal);
+                }
+                
+                waxSeal.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    const rect = waxSeal.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    lastMouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                    e.preventDefault();
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const rect = waxSeal.getBoundingClientRect();
+                        const centerX = rect.left + rect.width / 2;
+                        const centerY = rect.top + rect.height / 2;
+                        const mouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                        
+                        let deltaAngle = mouseAngle - lastMouseAngle;
+                        
+                        if (deltaAngle > 180) deltaAngle -= 360;
+                        if (deltaAngle < -180) deltaAngle += 360;
+                        
+                        currentAngle += deltaAngle;
+                        targetAngle = currentAngle;
+                        
+                        momentum = deltaAngle * 1.5 + (Math.random() - 0.5) * 15;
+                        
+                        lastMouseAngle = mouseAngle;
+                    }
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+                
+                updateSeal();
+                audio.play().catch(() => {});
+            }
+        });
+    </script>
+</body>
+</html>

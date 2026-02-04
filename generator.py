@@ -1,11 +1,14 @@
 import random
 import csv
 import os
-from flask import Flask, render_template, url_for, request
+from flask import Flask, render_template, url_for, request, redirect, flash, jsonify, session
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 from openai import OpenAI
 from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime
+import database as db
 CSV_ONE = "place.csv"
 CSV_TWO = "relative.csv"
 CACHE_FILE = "definitions_cache.csv"
@@ -398,26 +401,23 @@ def by_relative(placeNum,relative):
     return relative[0][p-1]
 
 def generate_definition_ai(word: str) -> str:
-    """Use OpenAI to create a unique, playful dictionary-style definition for a fake word."""
+    """Use OpenAI to create a natural, dictionary-style definition for a word."""
     # Fail fast if API key is missing
     if not os.getenv("OPENAI_API_KEY"):
         return "[Missing OPENAI_API_KEY: set it in your environment to enable AI definitions.]"
 
     system = (
-        "If the target word is an established entry in major dictionaries, return its standard dictionary definition instead of inventing one."
-        "You are a lexicographer and wordsmith tasked with inventing plausible definitions for new words. "
-        "Avoid vague phrasings such as \"state of\", \"feeling of\", or \"thing that\". "
-        "Make it realistic. "
-        "Give a good mix of verbs, nouns, and adjectives, adverbs, and other parts of speech."
+        "You are a professional lexicographer writing dictionary definitions. "
+        "Write clear, straightforward definitions as they would appear in a standard dictionary. "
+        "Use simple, direct language. Avoid flowery or overly creative descriptions. "
+        "If the word exists in dictionaries, provide its actual definition. "
+        "If it's a new word, write a practical, everyday definition that sounds like it belongs in a dictionary."
     )
     user = (
-        "If the target word is an established entry in major dictionaries, return its standard dictionary definition instead of inventing one."
-        f"Invent a dictionary-style plausible definition for the fake word \"{word}\". "
-        "Produce 1–2 sentences and keep the whole entry under ~40 words. "
-        "Append the part of speech in parentheses immediately after the word (for example (noun) or (verb)). "
-        "Optionally add a tiny example after \"e.g.,\" only if it sharpens the image. "
-        "Do not mention or admit the word is invented; present the entry as a natural dictionary line."
-        
+        f"Write a concise dictionary definition for the word \"{word}\". "
+        "Keep it under 30 words. Include the part of speech in parentheses (e.g., noun, verb, adj.). "
+        "Write it as a normal dictionary entry - straightforward and clear. "
+        "Example format: 'word (noun): a simple, clear explanation of what this means.'"
     )
     banned_terms = ["sock", "socks", "shoe", "shoes", "hosiery", "laundry", "drawer", "drawers","dance","squirrel","whimsical"]
     def _uses_banned(text: str) -> bool:
@@ -652,10 +652,259 @@ def choose_media_ai(word: str, definition: str, images: list[str], songs: list[s
 # ===== Flask Web App =====
 load_dotenv()  # load variables from .env if present
 app = Flask(__name__, static_folder='static', template_folder='templates')
+app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# User class for Flask-Login
+class User(UserMixin):
+    def __init__(self, id, username):
+        self.id = id
+        self.username = username
+
+@login_manager.user_loader
+def load_user(user_id):
+    user_data = db.get_user_by_id(int(user_id))
+    if user_data:
+        return User(user_data['id'], user_data['username'])
+    return None
 
 @app.route("/", methods=["GET"])
 def index():
     return render_template('app.html', song_url=None, pic_url=None, word=None, definition=None)
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == "POST":
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        confirm = request.form.get('confirm_password', '')
+        
+        if not username or not password:
+            flash('Username and password are required', 'error')
+            return render_template('register.html')
+        
+        if len(username) < 3:
+            flash('Username must be at least 3 characters', 'error')
+            return render_template('register.html')
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters', 'error')
+            return render_template('register.html')
+        
+        if password != confirm:
+            flash('Passwords do not match', 'error')
+            return render_template('register.html')
+        
+        if db.get_user_by_username(username):
+            flash('Username already taken', 'error')
+            return render_template('register.html')
+        
+        password_hash = generate_password_hash(password)
+        user_id = db.create_user(username, password_hash)
+        
+        flash('Account created successfully! Please log in.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == "POST":
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        user_data = db.get_user_by_username(username)
+        
+        if user_data and check_password_hash(user_data['password_hash'], password):
+            user = User(user_data['id'], user_data['username'])
+            login_user(user)
+            flash(f'Welcome back, {username}!', 'success')
+            return redirect(url_for('index'))
+        
+        flash('Invalid username or password', 'error')
+    
+    return render_template('login.html')
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out', 'success')
+    return redirect(url_for('index'))
+
+@app.route("/profile", methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'change_username':
+            new_username = request.form.get('new_username', '').strip()
+            if not new_username:
+                flash('Username cannot be empty', 'error')
+            elif len(new_username) < 3:
+                flash('Username must be at least 3 characters', 'error')
+            elif db.get_user_by_username(new_username):
+                flash('Username already taken', 'error')
+            else:
+                if db.update_username(current_user.id, new_username):
+                    current_user.username = new_username
+                    flash('Username updated successfully', 'success')
+                else:
+                    flash('Failed to update username', 'error')
+        
+        elif action == 'change_password':
+            current_password = request.form.get('current_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
+            
+            user = db.get_user_by_id(current_user.id)
+            if not check_password_hash(user['password_hash'], current_password):
+                flash('Current password is incorrect', 'error')
+            elif len(new_password) < 6:
+                flash('New password must be at least 6 characters', 'error')
+            elif new_password != confirm_password:
+                flash('New passwords do not match', 'error')
+            else:
+                password_hash = generate_password_hash(new_password)
+                if db.update_password(current_user.id, password_hash):
+                    flash('Password updated successfully', 'success')
+                else:
+                    flash('Failed to update password', 'error')
+        
+        return redirect(url_for('profile'))
+    
+    # GET request - show profile
+    my_words = db.get_user_words(current_user.id)
+    return render_template('profile.html', my_words=my_words)
+
+@app.route("/leaderboard")
+def leaderboard():
+    time_filter = request.args.get('filter', 'lifetime')
+    if time_filter not in ['day', 'month', 'lifetime']:
+        time_filter = 'lifetime'
+    
+    words = db.get_leaderboard(time_filter)
+    
+    # Get user votes if logged in
+    user_votes = {}
+    if current_user.is_authenticated:
+        for word in words:
+            vote = db.get_vote(word['id'], current_user.id)
+            if vote:
+                user_votes[word['id']] = vote
+    
+    return render_template('leaderboard.html', words=words, time_filter=time_filter, user_votes=user_votes)
+
+@app.route("/daily")
+def daily():
+    words = db.get_daily_words()
+    
+    # Get user votes if logged in
+    user_votes = {}
+    if current_user.is_authenticated:
+        for word in words:
+            vote = db.get_vote(word['id'], current_user.id)
+            if vote:
+                user_votes[word['id']] = vote
+    
+    return render_template('daily.html', words=words, user_votes=user_votes)
+
+@app.route("/lookup")
+def lookup():
+    query = request.args.get('q', '').strip()
+    results = []
+    
+    if query:
+        results = db.search_words(query)
+        
+        # Get user votes if logged in
+        user_votes = {}
+        if current_user.is_authenticated:
+            for word in results:
+                vote = db.get_vote(word['id'], current_user.id)
+                if vote:
+                    user_votes[word['id']] = vote
+        
+        return render_template('lookup.html', query=query, results=results, user_votes=user_votes)
+    
+    return render_template('lookup.html', query='', results=[])
+
+@app.route("/surprise")
+def surprise():
+    word = db.get_random_word()
+    if word:
+        pic_url = url_for('static', filename=f'images/{word["image"]}') if word['image'] else None
+        song_url = url_for('static', filename=f'songs/{word["song"]}') if word['song'] else None
+        
+        user_vote = None
+        if current_user.is_authenticated:
+            user_vote = db.get_vote(word['id'], current_user.id)
+        
+        return render_template('surprise.html', 
+                             word=word['word'],
+                             definition=word['definition'],
+                             pic_url=pic_url,
+                             song_url=song_url,
+                             word_id=word['id'],
+                             score=word['score'],
+                             user_vote=user_vote)
+    
+    flash('No words in database yet! Generate some first.', 'error')
+    return redirect(url_for('index'))
+
+@app.route("/word/<word_text>")
+def word_detail(word_text):
+    word = db.get_word_by_text(word_text)
+    if not word:
+        flash('Word not found', 'error')
+        return redirect(url_for('index'))
+    
+    pic_url = url_for('static', filename=f'images/{word["image"]}') if word['image'] else None
+    song_url = url_for('static', filename=f'songs/{word["song"]}') if word['song'] else None
+    
+    user_vote = None
+    score = db.get_word_score(word['id'])
+    if current_user.is_authenticated:
+        user_vote = db.get_vote(word['id'], current_user.id)
+    
+    created_date = word['created_at'].split('T')[0] if 'T' in word['created_at'] else word['created_at'].split(' ')[0]
+    status_label = f"Created on {created_date}"
+    
+    return render_template('word_detail.html',
+                         word=word['word'],
+                         definition=word['definition'],
+                         pic_url=pic_url,
+                         song_url=song_url,
+                         word_id=word['id'],
+                         score=score,
+                         user_vote=user_vote,
+                         status_label=status_label)
+
+@app.route("/vote", methods=["POST"])
+@login_required
+def vote():
+    data = request.get_json()
+    word_id = data.get('word_id')
+    vote_type = data.get('vote_type')  # 1 for upvote, -1 for downvote, 0 to remove
+    
+    if not word_id or vote_type not in [1, -1, 0]:
+        return jsonify({'success': False, 'error': 'Invalid vote'}), 400
+    
+    db.set_vote(word_id, current_user.id, vote_type)
+    score = db.get_word_score(word_id)
+    
+    return jsonify({'success': True, 'score': score, 'vote': vote_type})
 @app.route("/predict", methods=["POST"])
 def guess():
     song_folder = os.path.join(app.static_folder, 'songs')
@@ -717,63 +966,62 @@ def guess():
                 print(char_array)
         reconstructed = ''.join(char_array)
 
-    # Cache lookup first
-    cache = _load_defs_cache()
-    cached = cache.get(reconstructed.lower())
+    # Check database first
+    existing_word = db.get_word_by_text(reconstructed)
     status_label = None
-    if cached:
-        definition = cached.get("definition") or ""
-        # Display logic: cached entries are no longer shown as freshly minted
-        was_new = bool(cached.get("is_new", False))
-        created_at_cached = cached.get("created_at") or ""
-        if was_new:
-            # Show created date if we have it; else generic note
-            date_part = created_at_cached.split('T')[0] if 'T' in created_at_cached else (created_at_cached or None)
-            status_label = f" Created on {date_part}" if date_part else " Created earlier"
-        else:
-            status_label = " Pre-existing word"
-        is_new_word = False
-        chosen_image = cached.get("image")
-        chosen_song = cached.get("song")
-        try:
-            print(f"Cache HIT for '{reconstructed}': using cached definition and media")
-        except Exception:
-            pass
+    word_id = None
+    score = 0
+    user_vote = None
+    
+    if existing_word:
+        definition = existing_word['definition']
+        is_new_word = existing_word['is_new']
+        chosen_image = existing_word['image']
+        chosen_song = existing_word['song']
+        word_id = existing_word['id']
+        score = db.get_word_score(word_id)
+        
+        if current_user.is_authenticated:
+            user_vote = db.get_vote(word_id, current_user.id)
+        
+        created_date = existing_word['created_at'].split('T')[0] if 'T' in existing_word['created_at'] else existing_word['created_at'].split(' ')[0]
+        status_label = f"Created on {created_date}"
+        
+        print(f"Database HIT for '{reconstructed}': using existing word")
     else:
+        # Generate new word
         definition = generate_definition_ai(reconstructed)
         use_ai_for_known = (os.getenv("WORD_EXISTENCE_VIA_AI", "1").strip().lower() in ("1","true","yes","on"))
         if use_ai_for_known:
             is_new_word = not _is_known_word_ai(reconstructed)
         else:
             is_new_word = not _is_known_word(reconstructed)
-        # Choose media once and cache them for repeatability
+        
+        # Choose media once
         chosen_image, chosen_song = choose_media_ai(reconstructed, definition, pics, songs)
         source_label = "user" if custom else "generator"
-        # Persist a created_at we can also show on the page
-        created_now = datetime.utcnow().isoformat(timespec='seconds') + 'Z'
-        _append_defs_cache(reconstructed, definition, is_new_word, chosen_image, chosen_song, source=source_label, created_at=created_now)
-        status_label = " Freshly minted" if is_new_word else " Pre-existing word"
-        try:
-            print(f"Cache MISS for '{reconstructed}': generated and cached definition + media")
-        except Exception:
-            pass
-
-    # If cache hit provided media, reuse; otherwise choose now (covers legacy cache rows)
-    if not cached:
-        # already chosen above
-        pass
-    else:
-        if not chosen_image or not chosen_song:
-            ci, cs = choose_media_ai(reconstructed, definition, pics, songs)
-            chosen_image = chosen_image or ci
-            chosen_song = chosen_song or cs
-            # Update cache row append-only: write a new row with media populated and is_new set to 0
-            _append_defs_cache(reconstructed, definition, False, chosen_image, chosen_song, source=("user" if custom else "generator"))
+        
+        # Save to database
+        user_id = current_user.id if current_user.is_authenticated else None
+        word_id = db.save_word(reconstructed, definition, is_new_word, chosen_image, chosen_song, source_label, user_id)
+        
+        status_label = "Freshly minted" if is_new_word else "Pre-existing word"
+        
+        print(f"Database MISS for '{reconstructed}': generated and saved new word")
 
     pic_url = url_for('static', filename=f'images/{chosen_image}') if chosen_image else None
     song_url = url_for('static', filename=f'songs/{chosen_song}') if chosen_song else None
 
-    return render_template("app.html", word=reconstructed, song_url=song_url, pic_url=pic_url, definition=definition, is_new_word=is_new_word, status_label=status_label)
+    return render_template("app.html", 
+                         word=reconstructed, 
+                         song_url=song_url, 
+                         pic_url=pic_url, 
+                         definition=definition, 
+                         is_new_word=is_new_word, 
+                         status_label=status_label,
+                         word_id=word_id,
+                         score=score,
+                         user_vote=user_vote)
 
 
 
@@ -781,6 +1029,8 @@ def guess():
 
 
 if __name__ == '__main__':
+    # Initialize database
+    db.init_db()
     # Run on localhost by default
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='127.0.0.1', port=port, debug=False)
+    app.run(host='127.0.0.1', port=port, debug=True)
